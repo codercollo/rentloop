@@ -1,0 +1,250 @@
+rentloop/
+│
+├── cmd/
+│   ├── api/
+│   │   └── main.go                         # HTTP server entrypoint — boots config, DB, Redis, server
+│   └── worker/
+│       └── main.go                         # Worker entrypoint — boots Redis consumers + cron scheduler
+│
+├── internal/
+│   │
+│   ├── config/
+│   │   └── config.go                       # Viper — loads .env, validates required keys, typed Config struct
+│   │
+│   ├── db/
+│   │   ├── migrations/
+│   │   │   ├── 000001_init.up.sql          # landlords, properties, units, tenants
+│   │   │   ├── 000001_init.down.sql
+│   │   │   ├── 000002_payments.up.sql      # payment_events, tenant_balances
+│   │   │   ├── 000002_payments.down.sql
+│   │   │   ├── 000003_idempotency.up.sql   # processed_webhooks
+│   │   │   ├── 000003_idempotency.down.sql
+│   │   │   ├── 000004_billing.up.sql       # subscriptions, subscription_payments, billing_attempts
+│   │   │   ├── 000004_billing.down.sql
+│   │   │   ├── 000005_indexes.up.sql       # all performance indexes
+│   │   │   └── 000005_indexes.down.sql
+│   │   │
+│   │   ├── queries/
+│   │   │   ├── landlords.sql               # GetByEmail, GetByID, Create, Update
+│   │   │   ├── properties.sql              # Create, GetByID, GetByPaybill, ListByLandlord, Update, Delete
+│   │   │   ├── units.sql                   # Create, GetByCode, GetByID, ListByProperty, SetOccupied, Update, Delete
+│   │   │   ├── tenants.sql                 # Create, GetByUnit, GetByPhone, GetActive, MarkMovedOut, Update
+│   │   │   ├── payments.sql                # InsertEvent, GetByTransID, ListByUnit, ListByProperty, ListByTenant
+│   │   │   ├── balances.sql                # UpsertBalance, GetBalance, ListArrearsForProperty
+│   │   │   ├── webhooks.sql                # Insert, Exists, DeleteOlderThan
+│   │   │   └── billing.sql                 # CreateSubscription, GetByLandlord, GetByAccountCode,
+│   │   │                                   # UpdateStatus, CreatePayment, ListFailedThisMonth,
+│   │   │                                   # CreateAttempt, GetAttemptCount
+│   │   │
+│   │   ├── sqlc.yaml                       # engine: postgresql, schema: migrations/, queries: queries/
+│   │   │                                   # emit_interface: true, emit_json_tags: true
+│   │   │                                   # uuid override → github.com/google/uuid.UUID
+│   │   │
+│   │   └── generated/                      # !! NEVER EDIT — run: make sqlc-generate
+│   │       ├── db.go                       # DBTX interface, New(db) constructor
+│   │       ├── models.go                   # All structs — Landlord, Property, Unit, Tenant, PaymentEvent etc.
+│   │       ├── querier.go                  # Querier interface — all methods, used for mocking in tests
+│   │       ├── landlords.sql.go
+│   │       ├── properties.sql.go
+│   │       ├── units.sql.go
+│   │       ├── tenants.sql.go
+│   │       ├── payments.sql.go
+│   │       ├── balances.sql.go
+│   │       ├── webhooks.sql.go
+│   │       └── billing.sql.go
+│   │
+│   ├── domain/
+│   │   ├── landlord.go                     # RegisterLandlord, Authenticate (bcrypt), GetProfile
+│   │   ├── landlord_test.go
+│   │   ├── property.go                     # CreateProperty, GetSummary, ValidatePaybill
+│   │   ├── property_test.go
+│   │   ├── unit.go                         # CreateUnit, ValidateUnitCode, SetOccupancy
+│   │   ├── unit_test.go
+│   │   ├── tenant.go                       # AssignTenant, MoveOut, GetActiveTenant
+│   │   ├── tenant_test.go
+│   │   ├── payment.go                      # ReconcilePayment — THE most important file in the project
+│   │   │                                   # matches phone/unit_code → tenant → writes event → updates balance
+│   │   ├── payment_test.go                 # partial pay, full pay, overpay, wrong number, duplicate
+│   │   ├── arrears.go                      # CalculateArrears, RolloverMonth, ApplyCredit
+│   │   ├── arrears_test.go
+│   │   ├── billing.go                      # CreateSubscription, ActivateSubscription, PauseSubscription
+│   │   │                                   # ReconcileSubscriptionPayment, IsSubscriptionActive
+│   │   └── billing_test.go
+│   │
+│   ├── mpesa/
+│   │   ├── client.go                       # Client interface definition
+│   │   ├── daraja.go                       # Production implementation — STKPush, B2C, TransactionStatus
+│   │   ├── daraja_test.go                  # Tests against httptest mock Daraja server
+│   │   ├── mock_client.go                  # MockClient — implements Client, used in all other tests
+│   │   ├── auth.go                         # FetchToken, cache in Redis TTL 3500s
+│   │   ├── auth_test.go
+│   │   ├── c2b.go                          # C2BPayload struct, ParseC2BPayload, ValidateFields
+│   │   ├── c2b_test.go
+│   │   ├── stk.go                          # STKRequest/Response, BuildPassword (Base64 shortcode+passkey+ts)
+│   │   ├── stk_test.go
+│   │   └── iplist.go                       # SafaricomIPs — production + sandbox CIDR ranges as constants
+│   │
+│   ├── billing/
+│   │   ├── scheduler.go                    # BillingScheduler — runs on 1st of month, queries due subscriptions
+│   │   ├── scheduler_test.go
+│   │   ├── collector.go                    # FireSTKForSubscription, HandleSTKCallback, HandleManualPayment
+│   │   ├── collector_test.go
+│   │   ├── retry.go                        # RetryFailedPayments — day 3 and day 7 retry logic
+│   │   ├── retry_test.go
+│   │   └── notifier.go                     # SendTrialEndingWarning, SendPaymentReceipt, SendPausedNotice
+│   │
+│   ├── handlers/
+│   │   ├── auth.go                         # POST /auth/register  POST /auth/login  POST /auth/refresh
+│   │   ├── auth_test.go
+│   │   ├── properties.go                   # GET/POST /properties  GET/PUT/DELETE /properties/:id
+│   │   ├── properties_test.go
+│   │   ├── units.go                        # GET/POST /properties/:id/units  PUT/DELETE /units/:id
+│   │   ├── units_test.go
+│   │   ├── tenants.go                      # GET/POST /units/:id/tenant  PUT/DELETE /tenants/:id
+│   │   ├── tenants_test.go
+│   │   ├── payments.go                     # GET /payments  POST /payments/stk-push  GET /payments/export
+│   │   ├── payments_test.go
+│   │   ├── dashboard.go                    # GET /dashboard/:property_id
+│   │   ├── dashboard_test.go
+│   │   ├── webhooks.go                     # POST /webhooks/mpesa/c2b/validate
+│   │   │                                   # POST /webhooks/mpesa/c2b/confirm  ← most critical handler
+│   │   │                                   # POST /webhooks/mpesa/stk/callback
+│   │   ├── webhooks_test.go                # idempotency, IP guard, <100ms response, duplicate TransID
+│   │   ├── billing_webhooks.go             # POST /webhooks/mpesa/billing/confirm  ← SUB-XXXXX payments
+│   │   ├── billing_webhooks_test.go
+│   │   ├── admin.go                        # GET /admin/billing-overview  POST /admin/retry-all-failed
+│   │   │                                   # internal only — IP restricted to your machine
+│   │   └── health.go                       # GET /health — DB ping + Redis ping + version
+│   │
+│   ├── middleware/
+│   │   ├── auth.go                         # JWTAuth — validates Bearer, injects landlordID into ctx
+│   │   ├── auth_test.go
+│   │   ├── subscription.go                 # SubscriptionGuard — rejects API calls if account paused
+│   │   ├── subscription_test.go
+│   │   ├── mpesa_ip.go                     # MpesaIPGuard — X-Real-IP against SafaricomIPs
+│   │   ├── mpesa_ip_test.go
+│   │   ├── idempotency.go                  # WebhookDedup — Redis check + insert before handler runs
+│   │   ├── idempotency_test.go
+│   │   ├── logger.go                       # RequestLogger — zerolog structured logging per request
+│   │   ├── recovery.go                     # PanicRecovery — 500 + log stack trace
+│   │   └── ratelimit.go                    # TokenBucket — on /auth/* endpoints only
+│   │
+│   ├── queue/
+│   │   ├── events.go                       # PaymentEvent, SMSEvent, BillingEvent structs (JSON)
+│   │   ├── streams.go                      # Stream name constants — payments:incoming, sms:outbound, billing:events
+│   │   ├── producer.go                     # Publish* functions — XADD to Redis Stream
+│   │   ├── producer_test.go
+│   │   ├── consumer.go                     # ConsumeStream — XREADGROUP loop, ACK/NACK, dead-letter after 3 retries
+│   │   └── consumer_test.go
+│   │
+│   ├── scheduler/
+│   │   ├── scheduler.go                    # NewScheduler — registers all cron jobs, Start/Stop
+│   │   ├── arrears_job.go                  # RolloverArrears — 00:00 on 1st of month
+│   │   ├── arrears_job_test.go
+│   │   ├── reminder_job.go                 # SendRentReminders — 09:00 on 1st, 2nd, 3rd
+│   │   ├── reminder_job_test.go
+│   │   ├── billing_job.go                  # FireMonthlyBilling — 08:00 on 1st
+│   │   ├── billing_retry_job.go            # RetryFailedBilling — 08:00 on 3rd and 7th
+│   │   ├── summary_job.go                  # DailySummary — 08:00 every day to landlords
+│   │   ├── reconcile_job.go                # ReconcileSTK — 01:00 daily, checks orphaned STK pushes
+│   │   └── cleanup_job.go                  # CleanWebhooks — 03:00 every Sunday, purge >90 days
+│   │
+│   ├── sms/
+│   │   ├── client.go                       # SMSClient interface
+│   │   ├── africastalking.go               # AT implementation — Send, bulk send
+│   │   ├── africastalking_test.go
+│   │   ├── mock_client.go                  # MockSMSClient — records sent messages for test assertions
+│   │   └── templates.go                    # All SMS text builders:
+│   │                                       #   PaymentConfirmation(unit, amount, balance, ref)
+│   │                                       #   PartialPayment(unit, paid, remaining)
+│   │                                       #   Overpayment(unit, paid, credit)
+│   │                                       #   RentReminder(unit, amount, paybill)
+│   │                                       #   SubscriptionReceipt(plan, period, amount, ref)
+│   │                                       #   SubscriptionFailed(paybill, account, amount)
+│   │                                       #   SubscriptionPaused(paybill, account)
+│   │                                       #   TrialEnding(days_left, paybill, account)
+│   │
+│   └── server/
+│       ├── server.go                       # NewServer — read/write timeouts, graceful shutdown on SIGTERM
+│       └── routes.go                       # All chi route groups:
+│                                           #   /api/v1/* — JWT + SubscriptionGuard
+│                                           #   /webhooks/* — MpesaIPGuard + Idempotency
+│                                           #   /admin/* — IP restricted
+│                                           #   /health — open
+│                                           #   /metrics — open (Prometheus)
+│
+├── pkg/
+│   ├── money/
+│   │   ├── money.go                        # type KES int64 — Add, Sub, Mul, Format("KES 8,500"), Parse
+│   │   └── money_test.go                   # arithmetic, formatting, parsing, zero, negative, overflow
+│   ├── phone/
+│   │   ├── phone.go                        # Normalize: 07.. 01.. +254.. → 254XXXXXXXXX, Validate
+│   │   └── phone_test.go                   # all Kenyan prefixes + invalid inputs
+│   ├── token/
+│   │   ├── jwt.go                          # Generate(landlordID, duration), Parse → Claims
+│   │   └── jwt_test.go
+│   ├── pagination/
+│   │   ├── pagination.go                   # FromQuery(r) → Page, Limit, Offset
+│   │   └── pagination_test.go
+│   ├── apperrors/
+│   │   ├── errors.go                       # Typed errors: ErrNotFound, ErrUnauthorized, ErrConflict,
+│   │   │                                   # ErrPaymentDuplicate, ErrUnitNotFound, ErrSubscriptionPaused
+│   │   └── errors_test.go
+│   └── ctxkeys/
+│       └── keys.go                         # LandlordIDKey, RequestIDKey — typed to avoid string collisions
+│
+├── tests/
+│   └── integration/
+│       ├── testhelpers/
+│       │   ├── containers.go               # StartPostgres(), StartRedis() via testcontainers-go
+│       │   ├── fixtures.go                 # SeedLandlord, SeedProperty, SeedUnit, SeedTenant, SeedSubscription
+│       │   ├── mpesa_server.go             # httptest.NewServer — mimics Daraja validate/confirm/STK responses
+│       │   └── assertions.go               # AssertPaymentExists, AssertBalanceEquals, AssertSMSQueued helpers
+│       ├── c2b_flow_test.go                # webhook POST → worker → payment_events row → balance updated → SMS queued
+│       ├── c2b_duplicate_test.go           # same TransID twice → one DB row, second silently dropped
+│       ├── c2b_partial_payment_test.go     # KES 5000 on KES 8500 unit → partial status → correct arrears
+│       ├── stk_flow_test.go                # landlord triggers STK → callback arrives → payment recorded
+│       ├── stk_no_callback_test.go         # STK fired, no callback → reconcile job detects + replays
+│       ├── arrears_rollover_test.go        # partial payments across month boundary → arrears accumulate
+│       ├── billing_flow_test.go            # trial ends → STK fires → callback → subscription extended
+│       ├── billing_retry_test.go           # STK fails → day 3 retry → succeeds → subscription active
+│       ├── billing_pause_test.go           # day 7 no payment → status paused → API returns 402
+│       └── auth_flow_test.go               # register → login → use JWT → token expires → refresh
+│
+├── scripts/
+│   ├── setup_db.sh                         # createdb rentloop_dev + migrate up — idempotent
+│   ├── seed.sh                             # 1 landlord, 1 property, 4 units, 4 tenants, 1 active subscription
+│   ├── simulate_c2b.sh                     # curl POST fake C2B confirm to localhost:8080
+│   ├── simulate_stk_callback.sh            # curl POST fake STK success callback
+│   ├── simulate_billing_payment.sh         # curl POST fake SUB-XXXXX C2B confirm
+│   └── deploy.sh                           # build linux/amd64 → scp → migrate → systemctl restart
+│
+├── deployments/
+│   ├── nginx/
+│   │   └── rentloop.conf                   # /webhooks 10s, /api 30s, / static SPA, HTTP→HTTPS
+│   ├── systemd/
+│   │   ├── rentloop-api.service
+│   │   └── rentloop-worker.service
+│   └── docker-compose.yml                  # postgres:16 + redis:7 + mailhog — dev only
+│
+├── .github/
+│   └── workflows/
+│       ├── ci.yml                          # PR: go test ./... with postgres + redis service containers
+│       └── deploy.yml                      # main push: test → build linux/amd64 → scp → restart
+│
+├── docs/
+│   ├── api.md
+│   ├── mpesa_setup.md
+│   ├── sqlc_guide.md                       # how to add a query, regenerate, use in domain
+│   ├── billing_flows.md
+│   └── local_dev.md
+│
+├── web/                                    # Vue 3 frontend — see below
+│
+├── .env.example
+├── .gitignore
+├── .golangci.yml
+├── Makefile
+├── go.mod
+├── go.sum
+└── README.md
