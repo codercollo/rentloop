@@ -1,5 +1,7 @@
 //Package models defines the core domain data structures
 //
+// These structs represent entities persisted in the database
+// and supporting domain types used for rent payment tracking.
 
 package models
 
