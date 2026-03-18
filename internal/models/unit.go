@@ -14,7 +14,7 @@ type Unit struct {
 	UnitRef       string    `db:"unit_ref"`
 	TenantName    string    `db:"tenant_name"`
 	TenantPhone   string    `db:"tenant_phone"`
-	ExpectedRent  string    `db:"expected_rent"`
+	ExpectedRent  int       `db:"expected_rent"`
 	Active        bool      `db:"active"`
 	EffectiveFrom time.Time `db:"effective_from"`
 	CreatedAt     time.Time `db:"created_at"`

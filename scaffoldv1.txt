@@ -1,0 +1,152 @@
+rentloop/
+├── cmd/
+│   ├── server/
+│   │   └── main.go                    ← boot: config, DB, routes, cron, HTTP server
+│   │
+│   └── migrate/
+│       └── main.go                    ← run SQL migrations, then exit
+│
+├── internal/
+│   │
+│   ├── models/                        ✓ BUILT — domain types, no logic
+│   │   ├── landlord.go                ← Landlord, AdminUser
+│   │   ├── unit.go                    ← Unit
+│   │   ├── payment.go                 ← Payment, PaymentStatus, MonthlyBalance
+│   │   ├── subscription.go            ← SubscriptionStatus, SubscriptionPayment
+│   │   ├── agent.go                   ← Agent
+│   │   └── errors.go                  ← sentinel errors
+│   │
+│   ├── mpesa/                         ✓ BUILT — Daraja C2B webhook
+│   │   ├── handler.go                 ← POST /mpesa/c2b/callback
+│   │   │                                 returns 200 immediately, processes async
+│   │   ├── validator.go               ← Safaricom IP allowlist + payload check
+│   │   ├── types.go                   ← C2B request/response structs
+│   │   └── handler_test.go            ← 9 tests: IP block, payload, async timing
+│   │
+│   ├── matcher/                       ✓ BUILT — account ref → unit resolution
+│   │   ├── matcher.go                 ← normalise: "4b" "4 B" "UNIT4B" → "4B"
+│   │   └── matcher_test.go            ← 11 tests: variants, scoping, isolation
+│   │
+│   ├── ledger/                        ✓ BUILT — payment recording
+│   │   ├── service.go                 ← paid / partial / overpaid / idempotency
+│   │   ├── repository.go              ← payments SQL + GetUnitByRef
+│   │   └── service_test.go            ← 7 tests: all status paths + duplicate
+│   │
+│   ├── notifier/                      ✓ BUILT — outbound messaging
+│   │   ├── whatsapp.go                ← AT WhatsApp: landlord payment notification
+│   │   └── sms.go                     ← AT SMS: tenant receipt + reminder + onboarding
+│   │
+│   ├── bot/                           ← WhatsApp command parser
+│   │   ├── handler.go                 ← inbound AT webhook, route by sender role
+│   │   ├── commands.go                ← LIST, REMIND, RECEIPT, TOTAL, HISTORY,
+│   │   │                                 MARK, CLAIM, REPLACE, SET RENT
+│   │   ├── agent_commands.go          ← CLIENTS, LIST {name}, REMIND {name},
+│   │   │                                 RECEIPT {name} {unit}, TOTAL ALL
+│   │   ├── digest.go                  ← robfig/cron: 6 PM unpaid summary
+│   │   └── commands_test.go           ← command parsing + suspended lockout
+│   │
+│   ├── onboarding/                    ← JOIN flow + bulk tenant upload
+│   │   ├── handler.go                 ← JOIN, BULK ADD bot command entry points
+│   │   ├── csv_parser.go              ← download AT file URL, parse, validate rows
+│   │   └── csv_parser_test.go         ← bad phone, missing rent, blank unit, dupes
+│   │
+│   ├── landlord/                      ← landlord CRUD
+│   │   ├── handler.go                 ← ADD UNIT, REPLACE, SET RENT bot commands
+│   │   ├── service.go                 ← register landlord, update unit count
+│   │   ├── repository.go              ← landlords + units SQL
+│   │   └── service_test.go
+│   │
+│   ├── agent/                         ← agent management
+│   │   ├── handler.go                 ← agent onboarding entry point
+│   │   ├── service.go                 ← register agent, link landlords
+│   │   ├── repository.go              ← agents SQL, agent_id scoped queries
+│   │   └── service_test.go            ← agent scoping + isolation tests
+│   │
+│   ├── billing/                       ← subscription lifecycle
+│   │   ├── handler.go                 ← POST /billing/callback (subscription C2B)
+│   │   ├── service.go                 ← unit_count × KES 50, grace logic
+│   │   ├── repository.go              ← subscription_payments SQL, status updates
+│   │   ├── cron.go                    ← 1st of month: active → grace
+│   │   │                                 day 6: grace → suspended
+│   │   │                                 on payment: → active
+│   │   ├── middleware.go              ← CheckSubscription: gate all bot commands
+│   │   └── service_test.go            ← transitions, free tier, amount calc
+│   │
+│   ├── auth/                          ← admin JWT authentication
+│   │   ├── handler.go                 ← POST /admin/register, /login, /activate
+│   │   ├── service.go                 ← bcrypt + JWT sign/verify + HMAC token
+│   │   ├── repository.go              ← admin_users SQL
+│   │   ├── middleware.go              ← RequireAdmin JWT middleware
+│   │   └── service_test.go            ← bcrypt, JWT claims, activation expiry
+│   │
+│   ├── admin/                         ← admin dashboard
+│   │   ├── handler.go                 ← GET /admin/dashboard, /clients, /payments
+│   │   │                                 GET /admin/agents, /payments/unmatched
+│   │   ├── service.go                 ← MRR, active counts, grace/suspended totals
+│   │   ├── repository.go              ← aggregate queries
+│   │   └── service_test.go
+│   │
+│   ├── receipt/                       ← receipt generation
+│   │   ├── generator.go               ← html/template → receipt text (v1)
+│   │   │                                 PDF generation planned for v2
+│   │   ├── storage.go                 ← DO Spaces upload, returns public URL
+│   │   └── templates/
+│   │       └── receipt.html
+│   │
+│   ├── config/
+│   │   └── config.go                  ← env load + validate all required vars
+│   │
+│   └── db/
+│       ├── db.go                      ← pgx pool, ping on startup
+│       └── migrations/
+│           ├── 001_init.sql           ← landlords, units, payments + indexes
+│           ├── 002_receipts.sql       ← receipts table
+│           ├── 003_admin_users.sql    ← admin_users
+│           ├── 004_billing.sql        ← subscription_status, billing_cycle_end,
+│           │                             unit_count on landlords
+│           │                             + subscription_payments table
+│           └── 005_agents.sql         ← agents table + agent_id FK on landlords
+│
+├── web/                               ← admin UI (Go html/template + HTMX)
+│   ├── templates/
+│   │   ├── base.html                  ← layout: sidebar, nav, head
+│   │   ├── login.html
+│   │   ├── register.html
+│   │   ├── activate.html              ← token link from email
+│   │   ├── dashboard.html             ← MRR, active landlords, payments today,
+│   │   │                                 grace count, suspended count
+│   │   ├── clients.html               ← all landlords: name, units, MRR,
+│   │   │                                 plan, subscription status
+│   │   ├── client_detail.html         ← one landlord: units, payment history,
+│   │   │                                 billing history
+│   │   ├── agents.html                ← all agents: name, landlord count,
+│   │   │                                 total units, MRR
+│   │   ├── agent_detail.html          ← one agent: managed landlords,
+│   │   │                                 combined payment history
+│   │   └── payments.html              ← all C2B transactions, filterable
+│   │                                     + unmatched queue
+│   └── static/
+│       ├── css/
+│       │   └── admin.css
+│       └── js/
+│           └── htmx.min.js
+│
+├── pkg/
+│   └── httputil/
+│       └── respond.go                 ← JSON helpers, error wrapper
+│
+├── .github/
+│   └── workflows/
+│       ├── test.yml                   ← on push: go test ./... -race -count=1
+│       └── deploy.yml                 ← on push to main: build linux + scp + restart
+│
+├── deployments/
+│   ├── nginx.conf                     ← reverse proxy + SSL termination
+│   └── rentloop.service               ← systemd: auto-restart, non-root user
+│
+├── .env.example
+├── .env
+├── .gitignore
+├── Makefile
+├── go.mod
+└── go.sum
