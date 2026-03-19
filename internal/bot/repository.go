@@ -1,19 +1,4 @@
 // Package bot provides the database access layer for the WhatsApp bot interface.
-//
-// It is responsible for retrieving and managing data required for conversational
-// interactions between landlords, agents, and the system. This includes:
-//
-//   - Identifying landlords and agents via WhatsApp phone numbers
-//   - Fetching unit payment status and summaries for reporting
-//   - Supporting agent workflows (multi-landlord management)
-//   - Retrieving payment history and unmatched transactions
-//   - Assigning payments to units and maintaining consistency
-//   - Managing unit creation and landlord unit counts
-//   - Powering scheduled workflows such as unpaid rent reminders
-//
-// The package acts as a read/write service layer tailored for bot-driven queries,
-// optimizing for fast lookups, aggregated views, and operational workflows
-// triggered through chat interactions.
 package bot
 
 import (
@@ -97,7 +82,7 @@ func (r *Repository) GetUnitsWithStatus(ctx context.Context, landlordID, monthKe
 			COALESCE(SUM(p.amount) FILTER (WHERE p.status != 'unmatched'), 0) AS total_paid
 		FROM   units u
 		LEFT   JOIN payments p
-			ON p.unit_id   = u.id
+			ON p.unit_id    = u.id
 			AND p.month_key = $2
 		WHERE  u.landlord_id = $1
 		  AND  u.active      = TRUE
@@ -154,7 +139,7 @@ func (r *Repository) GetLandlordsByAgent(ctx context.Context, agentID string) ([
 	return results, rows.Err()
 }
 
-// GetLandlordByAgentAndName finds a landlord by partial name match within an agent's portfolio.
+// GetLandlordByAgentAndName finds a landlord by partial name within an agent's portfolio.
 func (r *Repository) GetLandlordByAgentAndName(ctx context.Context, agentID, name string) (*models.Landlord, error) {
 	var l models.Landlord
 	err := r.db.QueryRow(ctx, `
@@ -236,7 +221,7 @@ func (r *Repository) GetUnitByRef(ctx context.Context, landlordID, ref string) (
 	return &u, nil
 }
 
-// GetUnmatchedPayment returns an unmatched payment by transaction ID prefix.
+// GetUnmatchedPayment returns an unmatched payment by transaction ID.
 func (r *Repository) GetUnmatchedPayment(ctx context.Context, landlordID, transactionID string) (*models.Payment, error) {
 	var p models.Payment
 	err := r.db.QueryRow(ctx, `
@@ -263,9 +248,7 @@ func (r *Repository) GetUnmatchedPayment(ctx context.Context, landlordID, transa
 // AssignPaymentToUnit updates an unmatched payment to a specific unit.
 func (r *Repository) AssignPaymentToUnit(ctx context.Context, paymentID, unitID string) error {
 	_, err := r.db.Exec(ctx, `
-		UPDATE payments
-		SET    unit_id = $1, status = 'paid'
-		WHERE  id      = $2
+		UPDATE payments SET unit_id = $1, status = 'paid' WHERE id = $2
 	`, unitID, paymentID)
 	if err != nil {
 		return fmt.Errorf("assign payment to unit: %w", err)
@@ -273,7 +256,9 @@ func (r *Repository) AssignPaymentToUnit(ctx context.Context, paymentID, unitID 
 	return nil
 }
 
-// InsertUnit inserts a new unit and increments the landlord unit count.
+// InsertUnit inserts a new unit.
+// ON CONFLICT DO NOTHING means duplicate unit refs are silently skipped.
+// Unit count is incremented in the same transaction.
 func (r *Repository) InsertUnit(ctx context.Context, u models.Unit) (*models.Unit, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -298,9 +283,10 @@ func (r *Repository) InsertUnit(ctx context.Context, u models.Unit) (*models.Uni
 		return nil, fmt.Errorf("insert unit: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, `
-		UPDATE landlords SET unit_count = unit_count + 1 WHERE id = $1
-	`, u.LandlordID)
+	_, err = tx.Exec(ctx,
+		`UPDATE landlords SET unit_count = unit_count + 1 WHERE id = $1`,
+		u.LandlordID,
+	)
 	if err != nil {
 		_ = tx.Rollback(ctx)
 		return nil, fmt.Errorf("update unit count: %w", err)
@@ -312,7 +298,45 @@ func (r *Repository) InsertUnit(ctx context.Context, u models.Unit) (*models.Uni
 	return &inserted, nil
 }
 
-// GetLandlordsWithUnpaid returns all active landlords that have unpaid units this month.
+// CreateLandlord inserts a new landlord. On conflict updates the name.
+// Satisfies onboarding.Repository.
+func (r *Repository) CreateLandlord(ctx context.Context, l models.Landlord) (*models.Landlord, error) {
+	var created models.Landlord
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO landlords (whatsapp_phone, name, paybill_number, subscription_status)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (whatsapp_phone) DO UPDATE SET name = EXCLUDED.name
+		RETURNING id, whatsapp_phone, name, paybill_number,
+		          subscription_status, billing_cycle_end, unit_count, created_at
+	`,
+		l.WhatsAppPhone,
+		l.Name,
+		l.PaybillNumber,
+		string(l.SubscriptionStatus),
+	).Scan(
+		&created.ID, &created.WhatsAppPhone, &created.Name, &created.PaybillNumber,
+		&created.SubscriptionStatus, &created.BillingCycleEnd, &created.UnitCount, &created.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create landlord: %w", err)
+	}
+	return &created, nil
+}
+
+// UpdateUnitCount increments the landlord unit_count by delta.
+// Satisfies onboarding.Repository.
+func (r *Repository) UpdateUnitCount(ctx context.Context, landlordID string, delta int) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE landlords SET unit_count = unit_count + $1 WHERE id = $2`,
+		delta, landlordID,
+	)
+	if err != nil {
+		return fmt.Errorf("update unit count: %w", err)
+	}
+	return nil
+}
+
+// GetLandlordsWithUnpaid returns landlords with unpaid units this month.
 // Used by the 6 PM digest cron job.
 func (r *Repository) GetLandlordsWithUnpaid(ctx context.Context, monthKey string) ([]models.Landlord, error) {
 	rows, err := r.db.Query(ctx, `

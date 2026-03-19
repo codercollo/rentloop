@@ -1,25 +1,4 @@
 // Package bot implements the WhatsApp bot service layer for RentLoop.
-//
-// It orchestrates all conversational workflows between users (landlords and agents)
-// and the system, acting as the bridge between inbound messages and business logic.
-//
-// Responsibilities include:
-//
-//   - Identifying the sender (landlord or agent) via phone number
-//   - Routing and handling bot commands based on user role
-//   - Enforcing subscription rules (active, grace, suspended)
-//   - Coordinating data access through the BotRepository interface
-//   - Sending outbound WhatsApp messages via the Sender interface
-//   - Triggering SMS reminders to tenants via the SMSNotifier interface
-//   - Supporting payment matching and unit management workflows
-//
-// The package follows a service-oriented design where the Service struct
-// encapsulates all command handling logic, while dependencies (repository,
-// messaging, notifications) are injected via interfaces for flexibility
-// and testability.
-//
-// This layer is intentionally decoupled from transport (HTTP/webhooks)
-// and persistence implementations, making it easy to extend, test, and evolve.
 package bot
 
 import (
@@ -32,6 +11,7 @@ import (
 
 	"github.com/codercollo/rentloop/internal/matcher"
 	"github.com/codercollo/rentloop/internal/models"
+	"github.com/codercollo/rentloop/internal/onboarding"
 )
 
 // Sender sends outbound WhatsApp messages.
@@ -61,9 +41,10 @@ type BotRepository interface {
 
 // Service orchestrates all bot command logic.
 type Service struct {
-	repo   BotRepository
-	sender Sender
-	sms    SMSNotifier
+	repo       BotRepository
+	sender     Sender
+	sms        SMSNotifier
+	onboarding *onboarding.Service
 }
 
 // NewService wires all dependencies.
@@ -71,15 +52,28 @@ func NewService(repo BotRepository, sender Sender, sms SMSNotifier) *Service {
 	return &Service{repo: repo, sender: sender, sms: sms}
 }
 
+// SetOnboarding injects the onboarding service after construction.
+// Called from main.go after both services are initialised.
+func (s *Service) SetOnboarding(svc *onboarding.Service) {
+	s.onboarding = svc
+}
+
 // Handle is the main dispatch entry point called by the HTTP handler.
-// It identifies the sender, checks subscription, and routes the command.
 func (s *Service) Handle(ctx context.Context, from, text string) {
 	upper := strings.ToUpper(strings.TrimSpace(text))
 
-	// Identify sender role
 	landlord, agent, err := s.identify(ctx, from)
 	if err != nil {
 		if errors.Is(err, models.ErrNotFound) {
+			// Unknown sender — could be a new landlord trying to register
+			if upper == "JOIN" {
+				if s.onboarding != nil {
+					s.onboarding.HandleJoin(ctx, from)
+				} else {
+					s.reply(ctx, from, "Registration is not available right now. Please try again later.")
+				}
+				return
+			}
 			s.reply(ctx, from,
 				"Welcome to RentLoop.\n\n"+
 					"Send *JOIN* to register as a landlord, or contact your property manager.")
@@ -90,13 +84,12 @@ func (s *Service) Handle(ctx context.Context, from, text string) {
 		return
 	}
 
-	// Agent path
 	if agent != nil {
 		s.handleAgent(ctx, from, upper, agent)
 		return
 	}
 
-	// Landlord path — check subscription first
+	// Suspended — lockout
 	if landlord.SubscriptionStatus == models.StatusSuspended {
 		amount := landlord.UnitCount * 50
 		s.reply(ctx, from, fmt.Sprintf(
@@ -109,7 +102,7 @@ func (s *Service) Handle(ctx context.Context, from, text string) {
 		return
 	}
 
-	// Grace period — process command but append warning
+	// Grace — process command but append warning
 	graceWarning := ""
 	if landlord.SubscriptionStatus == models.StatusGrace {
 		amount := landlord.UnitCount * 50
@@ -120,11 +113,12 @@ func (s *Service) Handle(ctx context.Context, from, text string) {
 	}
 
 	response := s.handleLandlord(ctx, upper, landlord)
-	s.reply(ctx, from, response+graceWarning)
+	if response != "" {
+		s.reply(ctx, from, response+graceWarning)
+	}
 }
 
 // identify returns the landlord or agent for the given phone number.
-// Exactly one of (landlord, agent) will be non-nil on success.
 func (s *Service) identify(ctx context.Context, phone string) (*models.Landlord, *models.Agent, error) {
 	agent, err := s.repo.GetAgentByPhone(ctx, phone)
 	if err == nil {
@@ -141,13 +135,21 @@ func (s *Service) identify(ctx context.Context, phone string) (*models.Landlord,
 	return landlord, nil, nil
 }
 
-// monthKey returns the current YYYY-MM key in EAT.
+// monthKey returns the current YYYY-MM in EAT.
 func monthKey() string {
 	eat, err := time.LoadLocation("Africa/Nairobi")
 	if err != nil {
 		eat = time.FixedZone("EAT", 3*60*60)
 	}
 	return time.Now().In(eat).Format("2006-01")
+}
+
+// shortID returns the first 8 chars of an ID safely.
+func shortID(id string) string {
+	if len(id) >= 8 {
+		return id[:8]
+	}
+	return id
 }
 
 // reply sends a WhatsApp response and logs any failure.
@@ -160,12 +162,4 @@ func (s *Service) reply(ctx context.Context, to, message string) {
 // normaliseRef applies the same normalisation rules as the matcher package.
 func normaliseRef(raw string) string {
 	return matcher.Normalise(raw)
-}
-
-// shortID safely trims an ID to 8 characters to avoid slice panics.
-func shortID(id string) string {
-	if len(id) >= 8 {
-		return id[:8]
-	}
-	return id
 }

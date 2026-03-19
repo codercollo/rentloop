@@ -28,6 +28,7 @@ import (
 	"github.com/codercollo/rentloop/internal/models"
 	"github.com/codercollo/rentloop/internal/mpesa"
 	"github.com/codercollo/rentloop/internal/notifier"
+	"github.com/codercollo/rentloop/internal/onboarding"
 )
 
 func main() {
@@ -78,6 +79,10 @@ func main() {
 	// ── Bot ───────────────────────────────────────────────────────────────────
 	botSvc := bot.NewService(botRepo, waSender, smsSvc)
 	botHandler := bot.NewHandler(botSvc)
+
+	onboardingRepo := botRepo
+	onboardingSvc := onboarding.NewService(onboardingRepo, waSender, smsSvc)
+	botSvc.SetOnboarding(onboardingSvc)
 
 	// ── Cron — 6 PM daily digest ──────────────────────────────────────────────
 	c := cron.New()

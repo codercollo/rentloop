@@ -63,12 +63,24 @@ func (s *Service) handleLandlord(ctx context.Context, upper string, l *models.La
 	case "CLAIM":
 		// CLAIM TXN-ABC123 TO 4B
 		return s.cmdClaim(ctx, l, parts[1:])
+
 	case "JOIN":
-		return "You are already registered as a landlord.\n\n" +
-			"Send *ADD UNIT 4B John Kamau 0712345678 12500* to add a unit, " +
-			"or *BULK ADD* for CSV upload."
-	case "BULK", "HELP":
+		if s.onboarding != nil {
+			s.onboarding.HandleJoin(ctx, l.WhatsAppPhone)
+			return ""
+		}
+		return "You are already registered. Send *ADD UNIT 4B John Kamau 0712345678 12500* or *BULK ADD* for CSV upload."
+
+	case "BULK":
+		if s.onboarding != nil {
+			s.onboarding.HandleBulkAdd(ctx, l.WhatsAppPhone, "")
+			return ""
+		}
 		return helpText()
+
+	case "HELP":
+		return helpText()
+
 	default:
 		return helpText()
 	}
