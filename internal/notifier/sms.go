@@ -41,6 +41,24 @@ func (s *SMS) NotifyTenant(ctx context.Context, phone string, p *models.Payment,
 	return s.send(ctx, phone, buildTenantSMS(p, unit))
 }
 
+// NotifyLandlordSMS sends an SMS notification to the landlord.
+// Used as WhatsApp fallback until AT WhatsApp is provisioned.
+func (s *SMS) NotifyLandlordSMS(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
+	var msg string
+	if unit == nil {
+		msg = fmt.Sprintf(
+			"RentLoop: Unmatched payment KES %d received. Ref unknown. Reply CLAIM to assign. Txn: %s",
+			p.Amount, p.TransactionID,
+		)
+	} else {
+		msg = fmt.Sprintf(
+			"RentLoop: %s (Unit %s) paid KES %d. Status: %s. Ref: #%s",
+			unit.TenantName, unit.UnitRef, p.Amount, p.Status, shortID(p.ID),
+		)
+	}
+	return s.send(ctx, phone, msg)
+}
+
 // SendReminder sends a payment reminder to an unpaid tenant.
 func (s *SMS) SendReminder(ctx context.Context, phone, tenantName, unitRef string, expectedRent int, month string) error {
 	msg := fmt.Sprintf(
@@ -60,6 +78,13 @@ func (s *SMS) SendOnboarding(ctx context.Context, phone, tenantName, unitRef, pa
 		tenantName, expectedRent, paybill, unitRef,
 	)
 	return s.send(ctx, phone, msg)
+}
+
+// SendRaw sends a plain text SMS.
+// Used by the smsSender adapter in main.go so bot and onboarding
+// welcome messages go via SMS until AT WhatsApp is provisioned.
+func (s *SMS) SendRaw(ctx context.Context, to, message string) error {
+	return s.send(ctx, to, message)
 }
 
 // buildTenantSMS formats the SMS receipt for the tenant.
@@ -108,7 +133,6 @@ func (s *SMS) send(ctx context.Context, to, message string) error {
 	if err != nil {
 		return fmt.Errorf("sms: build request: %w", err)
 	}
-
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("apiKey", s.apiKey)
 	req.Header.Set("Accept", "application/json")
@@ -127,7 +151,7 @@ func (s *SMS) send(ctx context.Context, to, message string) error {
 	return nil
 }
 
-// SendActivationSMS sends a raw SMS for sandbox activation.
+// SendActivationSMS sends a raw SMS — used by the sandbox activation script.
 func (s *SMS) SendActivationSMS(ctx context.Context, to, message string) error {
 	return s.send(ctx, to, message)
 }

@@ -28,12 +28,15 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 // Returns models.ErrDuplicate when transaction_id already exists —
 // this is the idempotency guard against Daraja duplicate callbacks.
 func (r *Repository) InsertPayment(ctx context.Context, p models.Payment) (*models.Payment, error) {
-	unitID := p.UnitID
-	if unitID == "" {
-		unitID = "00000000-0000-0000-0000-000000000000"
+	// use *string so NULL scans correctly
+	var unitID *string
+	if p.UnitID != "" {
+		unitID = &p.UnitID
 	}
 
 	var inserted models.Payment
+	var scannedUnitID *string // receives NULL or a UUID string
+
 	err := r.db.QueryRow(ctx, `
 		INSERT INTO payments (
 			transaction_id, unit_id, landlord_id,
@@ -48,9 +51,16 @@ func (r *Repository) InsertPayment(ctx context.Context, p models.Payment) (*mode
 		p.TenantPhone, p.Amount, string(p.Status),
 		p.MonthKey, p.ReceiptURL, p.PaidAt,
 	).Scan(
-		&inserted.ID, &inserted.TransactionID, &inserted.UnitID, &inserted.LandlordID,
-		&inserted.TenantPhone, &inserted.Amount, &inserted.Status,
-		&inserted.MonthKey, &inserted.ReceiptURL, &inserted.PaidAt,
+		&inserted.ID,
+		&inserted.TransactionID,
+		&scannedUnitID, // ← nullable
+		&inserted.LandlordID,
+		&inserted.TenantPhone,
+		&inserted.Amount,
+		&inserted.Status,
+		&inserted.MonthKey,
+		&inserted.ReceiptURL,
+		&inserted.PaidAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -58,6 +68,11 @@ func (r *Repository) InsertPayment(ctx context.Context, p models.Payment) (*mode
 			return nil, models.ErrDuplicate
 		}
 		return nil, fmt.Errorf("insert payment: %w", err)
+	}
+
+	// set UnitID only if not NULL
+	if scannedUnitID != nil {
+		inserted.UnitID = *scannedUnitID
 	}
 
 	return &inserted, nil

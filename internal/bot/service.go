@@ -163,3 +163,23 @@ func (s *Service) reply(ctx context.Context, to, message string) {
 func normaliseRef(raw string) string {
 	return matcher.Normalise(raw)
 }
+
+// HandleSMS is the SMS entry point. It normalises the phone number
+// then delegates to the same command pipeline as WhatsApp.
+func (s *Service) HandleSMS(ctx context.Context, from, text string) {
+	from = normaliseSMSPhone(from)
+	s.Handle(ctx, from, text)
+}
+
+// normaliseSMSPhone converts 07XXXXXXXX → +254XXXXXXXX so the DB
+// lookup finds the same landlord regardless of which channel they use.
+func normaliseSMSPhone(phone string) string {
+	phone = strings.TrimSpace(phone)
+	if strings.HasPrefix(phone, "07") || strings.HasPrefix(phone, "01") {
+		return "+254" + phone[1:]
+	}
+	if strings.HasPrefix(phone, "254") && !strings.HasPrefix(phone, "+") {
+		return "+" + phone
+	}
+	return phone
+}
