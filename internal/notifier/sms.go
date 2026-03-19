@@ -2,18 +2,18 @@
 package notifier
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/codercollo/rentloop/internal/models"
 )
 
-const atSMSURL = "https://api.africastalking.com/version1/messaging"
+const atSMSURL = "https://api.sandbox.africastalking.com/version1/messaging"
 
 // SMS sends outbound SMS messages via Africa's Talking.
 type SMS struct {
@@ -98,23 +98,18 @@ func buildTenantSMS(p *models.Payment, unit *models.Unit) string {
 
 // send POSTs an SMS via Africa's Talking.
 func (s *SMS) send(ctx context.Context, to, message string) error {
-	payload := map[string]string{
-		"username": s.username,
-		"to":       to,
-		"message":  message,
-		"from":     s.senderID,
-	}
+	data := url.Values{}
+	data.Set("username", s.username)
+	data.Set("to", to)
+	data.Set("message", message)
+	data.Set("from", s.senderID)
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("sms: marshal: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, atSMSURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, atSMSURL, strings.NewReader(data.Encode()))
 	if err != nil {
 		return fmt.Errorf("sms: build request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("apiKey", s.apiKey)
 	req.Header.Set("Accept", "application/json")
 
@@ -130,4 +125,9 @@ func (s *SMS) send(ctx context.Context, to, message string) error {
 
 	slog.Info("sms: message sent", "to", to, "status", resp.StatusCode)
 	return nil
+}
+
+// SendActivationSMS sends a raw SMS for sandbox activation.
+func (s *SMS) SendActivationSMS(ctx context.Context, to, message string) error {
+	return s.send(ctx, to, message)
 }

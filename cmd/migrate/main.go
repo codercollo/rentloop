@@ -60,7 +60,7 @@ func run(ctx context.Context, pool *pgxpool.Pool) error {
 
 	applied, err := appliedMigrations(ctx, pool)
 	if err != nil {
-		return fmt.Errorf("fetch applied migrations: %w", &err)
+		return fmt.Errorf("fetch applied migrations: %w", err)
 	}
 
 	var ran int

@@ -3,12 +3,11 @@
 package notifier
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/codercollo/rentloop/internal/models"
@@ -22,14 +21,27 @@ type WhatsApp struct {
 	username string
 	from     string
 	client   *http.Client
+	baseURL  string // empty = production AT URL; set in tests to a local server
 }
 
-// NewWhatsApp returns a configured WhatsApp notifier.
+// NewWhatsApp returns a configured WhatsApp notifier pointed at Africa's Talking.
 func NewWhatsApp(apiKey, username, from string) *WhatsApp {
 	return &WhatsApp{
 		apiKey:   apiKey,
 		username: username,
 		from:     from,
+		client:   &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+// NewWhatsAppWithURL is used in tests to inject a custom endpoint URL
+// instead of the real Africa's Talking API.
+func NewWhatsAppWithURL(url, apiKey, username, from string) *WhatsApp {
+	return &WhatsApp{
+		apiKey:   apiKey,
+		username: username,
+		from:     from,
+		baseURL:  url,
 		client:   &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -40,64 +52,32 @@ func (w *WhatsApp) NotifyLandlord(ctx context.Context, landlordPhone string, p *
 	if p == nil {
 		return fmt.Errorf("whatsapp: payment is nil")
 	}
-	msg := buildLandlordMessage(p, unit)
-	return w.send(ctx, landlordPhone, msg)
+	return w.send(ctx, landlordPhone, buildLandlordMessage(p, unit))
 }
 
-// buildLandlordMessage formats the WhatsApp notification for the landlord.
-func buildLandlordMessage(p *models.Payment, unit *models.Unit) string {
-	if unit == nil {
-		return fmt.Sprintf(
-			"*RentLoop* — Unmatched payment\n"+
-				"Amount: KES %d\n"+
-				"From: %s\n"+
-				"Transaction: %s\n\n"+
-				"Reply *CLAIM %s TO <unit>* to assign it.",
-			p.Amount, p.TenantPhone, p.TransactionID, p.TransactionID,
-		)
-	}
-
-	emoji := statusEmoji(p.Status)
-
-	msg := fmt.Sprintf(
-		"*RentLoop* %s\n"+
-			"%s (Unit %s) paid KES %d\n"+
-			"Status: %s\n"+
-			"Time: %s\n"+
-			"Receipt: #%s",
-		emoji,
-		unit.TenantName, unit.UnitRef, p.Amount,
-		formatStatus(p.Status),
-		p.PaidAt.In(eatLocation()).Format("02 Jan 15:04"),
-		shortID(p.ID),
-	)
-
-	if p.Status == models.PaymentStatusPartial {
-		msg += "\n\n_Partial payment — unit not yet fully paid._"
-	}
-
-	return msg
+// SendRaw sends a plain text message to any WhatsApp number.
+// Used by the bot package which composes its own message strings.
+func (w *WhatsApp) SendRaw(ctx context.Context, to, message string) error {
+	return w.send(ctx, to, message)
 }
 
-// send POSTs a WhatsApp message via Africa's Talking.
+// send POSTs a form-encoded message via Africa's Talking.
 func (w *WhatsApp) send(ctx context.Context, to, message string) error {
-	payload := map[string]string{
-		"username": w.username,
-		"to":       to,
-		"message":  message,
-		"from":     w.from,
+	url := atWhatsAppURL
+	if w.baseURL != "" {
+		url = w.baseURL
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("whatsapp: marshal: %w", err)
-	}
+	data := "username=" + w.username +
+		"&to=" + to +
+		"&message=" + message +
+		"&from=" + w.from
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, atWhatsAppURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("whatsapp: build request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("apiKey", w.apiKey)
 	req.Header.Set("Accept", "application/json")
 
@@ -113,6 +93,40 @@ func (w *WhatsApp) send(ctx context.Context, to, message string) error {
 
 	slog.Info("whatsapp: message sent", "to", to, "status", resp.StatusCode)
 	return nil
+}
+
+// ── Message builders ──────────────────────────────────────────────────────────
+
+func buildLandlordMessage(p *models.Payment, unit *models.Unit) string {
+	if unit == nil {
+		return fmt.Sprintf(
+			"*RentLoop* — Unmatched payment\n"+
+				"Amount: KES %d\n"+
+				"From: %s\n"+
+				"Transaction: %s\n\n"+
+				"Reply *CLAIM %s TO <unit>* to assign it.",
+			p.Amount, p.TenantPhone, p.TransactionID, p.TransactionID,
+		)
+	}
+
+	msg := fmt.Sprintf(
+		"*RentLoop* %s\n"+
+			"%s (Unit %s) paid KES %d\n"+
+			"Status: %s\n"+
+			"Time: %s\n"+
+			"Receipt: #%s",
+		statusEmoji(p.Status),
+		unit.TenantName, unit.UnitRef, p.Amount,
+		formatStatus(p.Status),
+		p.PaidAt.In(eatLocation()).Format("02 Jan 15:04"),
+		shortID(p.ID),
+	)
+
+	if p.Status == models.PaymentStatusPartial {
+		msg += "\n\n_Partial payment — unit not yet fully paid._"
+	}
+
+	return msg
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -27,7 +27,7 @@ type LedgerService interface {
 
 // NotifierService sends outbound messages.
 type NotifierService interface {
-	NotifyLandlord(ctx context.Context, landlordID string, payment *models.Payment, unit *models.Unit) error
+	NotifyLandlord(ctx context.Context, landlordPhone string, payment *models.Payment, unit *models.Unit) error
 	NotifyTenant(ctx context.Context, phone string, payment *models.Payment, unit *models.Unit) error
 }
 
@@ -70,14 +70,12 @@ func NewHandler(
 //   - The transaction_id UNIQUE constraint in Postgres is the
 //     idempotency guard against duplicate callbacks.
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
-	// ── 1. IP validation ─────────────────────────────────────────────────────
 	if err := ValidateIP(r, h.isDev); err != nil {
 		slog.Warn("mpesa callback: blocked IP", "error", err, "remote", r.RemoteAddr)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
-	// ── 2. Decode payload ─────────────────────────────────────────────────────
 	var cb C2BCallback
 	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
 		slog.Warn("mpesa callback: malformed JSON", "error", err)
@@ -88,7 +86,6 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── 3. Validate required fields ───────────────────────────────────────────
 	if err := ValidatePayload(&cb); err != nil {
 		slog.Warn("mpesa callback: invalid payload", "error", err, "trans_id", cb.TransID)
 		writeJSON(w, http.StatusUnprocessableEntity, C2BResponse{
@@ -105,19 +102,15 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		"msisdn", cb.MSISDN,
 	)
 
-	// ── 4. Respond to Safaricom immediately ───────────────────────────────────
-	// Daraja will retry if we do not respond within ~5 seconds.
-	// All processing happens asynchronously below.
+	// Respond to Safaricom immediately — must be within 5 seconds.
+	// All processing happens asynchronously in the goroutine below.
 	writeJSON(w, http.StatusOK, successResponse)
 
-	// ── 5. Process asynchronously ─────────────────────────────────────────────
-	// Use a detached context — the request context is cancelled the moment
-	// the response is written. Give the goroutine 30 seconds to complete.
 	go h.process(cb)
 }
 
 // process runs the full payment pipeline after the HTTP response is sent.
-// Errors are logged — nothing bubbles up to the caller.
+// All errors are logged — nothing panics the server.
 func (h *Handler) process(cb C2BCallback) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -139,8 +132,6 @@ func (h *Handler) process(cb C2BCallback) {
 			"landlord_id", landlord.ID,
 			"error", err,
 		)
-		// Still record the payment as unmatched so the admin can claim it.
-		// Notifier will alert the landlord about an unmatched transaction.
 		h.handleUnmatched(ctx, cb, landlord)
 		return
 	}
@@ -170,6 +161,13 @@ func (h *Handler) process(cb C2BCallback) {
 		return
 	}
 
+	// nil recorded means the transaction_id already exists — duplicate callback.
+	// The UNIQUE constraint silently discarded it. Nothing more to do.
+	if recorded == nil {
+		log.Info("process: duplicate transaction skipped", "trans_id", cb.TransID)
+		return
+	}
+
 	log.Info("process: payment recorded",
 		"payment_id", recorded.ID,
 		"unit", unit.UnitRef,
@@ -177,11 +175,11 @@ func (h *Handler) process(cb C2BCallback) {
 		"status", recorded.Status,
 	)
 
-	// ── Notify landlord via WhatsApp ──────────────────────────────────────────
-	if err := h.notifier.NotifyLandlord(ctx, landlord.ID, recorded, unit); err != nil {
+	// ── Notify landlord ───────────────────────────────────────────────────────
+	// Non-fatal: payment is already recorded safely. A notification failure
+	// must never prevent the tenant receipt from being sent.
+	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, unit); err != nil {
 		log.Error("process: landlord notification failed", "error", err)
-		// Non-fatal — payment is recorded, notification failure should not
-		// block the receipt being sent to the tenant.
 	}
 
 	// ── Send receipt to tenant via SMS ────────────────────────────────────────
@@ -191,7 +189,7 @@ func (h *Handler) process(cb C2BCallback) {
 }
 
 // handleUnmatched records a payment that could not be matched to a unit
-// and alerts the landlord so they can manually claim it via CLAIM command.
+// and alerts the landlord so they can claim it manually via CLAIM command.
 func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord *models.Landlord) {
 	log := slog.With("trans_id", cb.TransID, "ref", cb.BillRefNumber)
 
@@ -201,7 +199,6 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 		return
 	}
 
-	// Record with empty unit_id — the admin or landlord can assign it later.
 	payment := models.Payment{
 		TransactionID: cb.TransID,
 		LandlordID:    landlord.ID,
@@ -218,24 +215,26 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 		return
 	}
 
+	// nil = duplicate — already handled, nothing to do
+	if recorded == nil {
+		return
+	}
+
 	log.Warn("handleUnmatched: payment recorded as unmatched",
 		"payment_id", recorded.ID,
 		"ref", cb.BillRefNumber,
 	)
 
-	// Alert landlord about the unmatched transaction.
-	if err := h.notifier.NotifyLandlord(ctx, landlord.ID, recorded, nil); err != nil {
+	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, nil); err != nil {
 		log.Error("handleUnmatched: landlord notification failed", "error", err)
 	}
 }
 
 // monthKey derives a YYYY-MM string from Safaricom's YYYYMMDDHHmmss format.
-// Used as a grouping key for monthly payment queries.
 func monthKey(transTime string) string {
 	if len(transTime) < 6 {
 		return time.Now().Format("2006-01")
 	}
-	// YYYYMMDDHHmmss → YYYY-MM
 	return transTime[:4] + "-" + transTime[4:6]
 }
 
