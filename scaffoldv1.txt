@@ -1,10 +1,11 @@
+
 rentloop/
 ├── cmd/
 │   ├── server/
-│   │   └── main.go                    ← boot: config, DB, routes, cron, HTTP server
+│   │   └── main.go                    ✓ BUILT — Twilio wiring, all routes mounted
 │   │
 │   └── migrate/
-│       └── main.go                    ← run SQL migrations, then exit
+│       └── main.go                    ✓ BUILT — SQL migration runner
 │
 ├── internal/
 │   │
@@ -18,10 +19,10 @@ rentloop/
 │   │
 │   ├── mpesa/                         ✓ BUILT — Daraja C2B webhook
 │   │   ├── handler.go                 ← POST /mpesa/c2b/callback
-│   │   │                                 returns 200 immediately, processes async
+│   │   │                                 nil-safe, returns 200 immediately, async
 │   │   ├── validator.go               ← Safaricom IP allowlist + payload check
-│   │   ├── types.go                   ← C2B request/response structs
-│   │   └── handler_test.go            ← 9 tests: IP block, payload, async timing
+│   │   ├── types.go                   ← C2B structs + successResponse
+│   │   └── handler_test.go            ← 10 tests: IP block, payload, async, duplicate
 │   │
 │   ├── matcher/                       ✓ BUILT — account ref → unit resolution
 │   │   ├── matcher.go                 ← normalise: "4b" "4 B" "UNIT4B" → "4B"
@@ -29,124 +30,120 @@ rentloop/
 │   │
 │   ├── ledger/                        ✓ BUILT — payment recording
 │   │   ├── service.go                 ← paid / partial / overpaid / idempotency
-│   │   ├── repository.go              ← payments SQL + GetUnitByRef
-│   │   └── service_test.go            ← 7 tests: all status paths + duplicate
+│   │   ├── repository.go              ← payments SQL, GetUnitByRef, GetByPaybill
+│   │   │                                 nullable unit_id for unmatched payments
+│   │   └── service_test.go            ← 8 tests: all status paths + duplicate
 │   │
-│   ├── notifier/                      ✓ BUILT — outbound messaging
-│   │   ├── whatsapp.go                ← AT WhatsApp: landlord payment notification
-│   │   └── sms.go                     ← AT SMS: tenant receipt + reminder + onboarding
+│   ├── notifier/                      ✓ BUILT — outbound messaging via Twilio
+│   │   ├── twilio.go                  ← WhatsApp + SMS: landlord, tenant, reminders
+│   │   │                                 SendRaw (bot), SendRawSMS (onboarding)
+│   │   ├── twilio_test.go             ← 5 tests: httptest server, all message types
+│   │   ├── whatsapp.go                ← AT WhatsApp (kept, not wired in main.go)
+│   │   └── sms.go                     ← AT SMS (kept, not wired in main.go)
 │   │
-│   ├── bot/                           ← WhatsApp command parser
-│   │   ├── handler.go                 ← inbound AT webhook, route by sender role
+│   ├── bot/                           ✓ BUILT — WhatsApp + SMS command bot
+│   │   ├── handler.go                 ← Twilio + AT form-encoded inbound
+│   │   │                                 strips whatsapp: prefix, async processing
+│   │   ├── sms_handler.go             ← POST /bot/sms, form-encoded, async
+│   │   ├── service.go                 ← identify sender, subscription gate,
+│   │   │                                 HandleSMS + normaliseSMSPhone
 │   │   ├── commands.go                ← LIST, REMIND, RECEIPT, TOTAL, HISTORY,
-│   │   │                                 MARK, CLAIM, REPLACE, SET RENT
+│   │   │                                 MARK (ledger write), CLAIM, REPLACE
+│   │   │                                 (soft-delete), SET RENT (DB update)
 │   │   ├── agent_commands.go          ← CLIENTS, LIST {name}, REMIND {name},
 │   │   │                                 RECEIPT {name} {unit}, TOTAL ALL
+│   │   ├── repository.go              ← all bot SQL + CreateLandlord,
+│   │   │                                 UpdateUnitCount, ReplaceUnitTenant,
+│   │   │                                 UpdateExpectedRent, InsertManualPayment
 │   │   ├── digest.go                  ← robfig/cron: 6 PM unpaid summary
-│   │   └── commands_test.go           ← command parsing + suspended lockout
+│   │   └── commands_test.go           ← 12 tests: all commands + stubs
 │   │
-│   ├── onboarding/                    ← JOIN flow + bulk tenant upload
-│   │   ├── handler.go                 ← JOIN, BULK ADD bot command entry points
-│   │   ├── csv_parser.go              ← download AT file URL, parse, validate rows
-│   │   └── csv_parser_test.go         ← bad phone, missing rent, blank unit, dupes
+│   ├── onboarding/                    ✓ BUILT — JOIN flow + CSV bulk upload
+│   │   ├── handler.go                 ← HandleJoin, HandleBulkAdd
+│   │   │                                 welcome via smsSender (Twilio SMS)
+│   │   ├── csv_parser.go              ← download URL, parse, validate rows
+│   │   │                                 normalise phone + unit ref per row
+│   │   └── csv_parser_test.go         ← 13 tests: all validation paths
 │   │
-│   ├── landlord/                      ← landlord CRUD
-│   │   ├── handler.go                 ← ADD UNIT, REPLACE, SET RENT bot commands
-│   │   ├── service.go                 ← register landlord, update unit count
-│   │   ├── repository.go              ← landlords + units SQL
-│   │   └── service_test.go
+│   ├── landlord/                      ✗ NOT BUILT — planned v1.1
+│   │   └── (empty)
 │   │
-│   ├── agent/                         ← agent management
-│   │   ├── handler.go                 ← agent onboarding entry point
-│   │   ├── service.go                 ← register agent, link landlords
-│   │   ├── repository.go              ← agents SQL, agent_id scoped queries
-│   │   └── service_test.go            ← agent scoping + isolation tests
+│   ├── agent/                         ✗ NOT BUILT — planned v1.1
+│   │   └── (empty)
 │   │
-│   ├── billing/                       ← subscription lifecycle
-│   │   ├── handler.go                 ← POST /billing/callback (subscription C2B)
-│   │   ├── service.go                 ← unit_count × KES 50, grace logic
-│   │   ├── repository.go              ← subscription_payments SQL, status updates
-│   │   ├── cron.go                    ← 1st of month: active → grace
-│   │   │                                 day 6: grace → suspended
-│   │   │                                 on payment: → active
-│   │   ├── middleware.go              ← CheckSubscription: gate all bot commands
-│   │   └── service_test.go            ← transitions, free tier, amount calc
+│   ├── billing/                       ✗ NOT BUILT — planned v1.1
+│   │   └── (empty)                       active → grace → suspended cron
 │   │
-│   ├── auth/                          ← admin JWT authentication
-│   │   ├── handler.go                 ← POST /admin/register, /login, /activate
-│   │   ├── service.go                 ← bcrypt + JWT sign/verify + HMAC token
-│   │   ├── repository.go              ← admin_users SQL
-│   │   ├── middleware.go              ← RequireAdmin JWT middleware
-│   │   └── service_test.go            ← bcrypt, JWT claims, activation expiry
+│   ├── auth/                          ✗ NOT BUILT — planned v1.1
+│   │   └── (empty)                       admin JWT login
 │   │
-│   ├── admin/                         ← admin dashboard
-│   │   ├── handler.go                 ← GET /admin/dashboard, /clients, /payments
-│   │   │                                 GET /admin/agents, /payments/unmatched
-│   │   ├── service.go                 ← MRR, active counts, grace/suspended totals
-│   │   ├── repository.go              ← aggregate queries
-│   │   └── service_test.go
+│   ├── admin/                         ✗ NOT BUILT — planned v1.1
+│   │   └── (empty)                       dashboard: MRR, clients, payments
 │   │
-│   ├── receipt/                       ← receipt generation
-│   │   ├── generator.go               ← html/template → receipt text (v1)
-│   │   │                                 PDF generation planned for v2
-│   │   ├── storage.go                 ← DO Spaces upload, returns public URL
-│   │   └── templates/
-│   │       └── receipt.html
+│   ├── receipt/                       ✗ NOT BUILT — planned v2
+│   │   └── (empty)                       PDF generation + DO Spaces upload
 │   │
 │   ├── config/
-│   │   └── config.go                  ← env load + validate all required vars
+│   │   └── config.go                  ✓ BUILT — env load + validate
+│   │                                     includes Twilio + AT credentials
 │   │
 │   └── db/
-│       ├── db.go                      ← pgx pool, ping on startup
+│       ├── db.go                      ✓ BUILT — pgx pool, ping on startup
 │       └── migrations/
-│           ├── 001_init.sql           ← landlords, units, payments + indexes
-│           ├── 002_receipts.sql       ← receipts table
-│           ├── 003_admin_users.sql    ← admin_users
-│           ├── 004_billing.sql        ← subscription_status, billing_cycle_end,
+│           ├── 001_init.sql           ✓ landlords, units, payments + indexes
+│           │                             unit_id nullable for unmatched payments
+│           ├── 002_receipts.sql       ✓ receipts table
+│           ├── 003_admin_users.sql    ✓ admin_users
+│           ├── 004_billing.sql        ✓ subscription_status, billing_cycle_end,
 │           │                             unit_count on landlords
 │           │                             + subscription_payments table
-│           └── 005_agents.sql         ← agents table + agent_id FK on landlords
+│           └── 005_agents.sql         ✓ agents table + agent_id FK on landlords
 │
-├── web/                               ← admin UI (Go html/template + HTMX)
+├── web/                               ✗ NOT BUILT — planned v1.1 (admin UI)
 │   ├── templates/
-│   │   ├── base.html                  ← layout: sidebar, nav, head
+│   │   ├── base.html
 │   │   ├── login.html
 │   │   ├── register.html
-│   │   ├── activate.html              ← token link from email
-│   │   ├── dashboard.html             ← MRR, active landlords, payments today,
-│   │   │                                 grace count, suspended count
-│   │   ├── clients.html               ← all landlords: name, units, MRR,
-│   │   │                                 plan, subscription status
-│   │   ├── client_detail.html         ← one landlord: units, payment history,
-│   │   │                                 billing history
-│   │   ├── agents.html                ← all agents: name, landlord count,
-│   │   │                                 total units, MRR
-│   │   ├── agent_detail.html          ← one agent: managed landlords,
-│   │   │                                 combined payment history
-│   │   └── payments.html              ← all C2B transactions, filterable
-│   │                                     + unmatched queue
+│   │   ├── activate.html
+│   │   ├── dashboard.html
+│   │   ├── clients.html
+│   │   ├── client_detail.html
+│   │   ├── agents.html
+│   │   ├── agent_detail.html
+│   │   └── payments.html
 │   └── static/
-│       ├── css/
-│       │   └── admin.css
-│       └── js/
-│           └── htmx.min.js
+│       ├── css/admin.css
+│       └── js/htmx.min.js
 │
 ├── pkg/
 │   └── httputil/
 │       └── respond.go                 ← JSON helpers, error wrapper
 │
+├── sandbox/                           ← local testing scripts, not deployed
+│   └── sms/
+│       └── activate/                  ← AT sandbox activation helper
+│
 ├── .github/
 │   └── workflows/
-│       ├── test.yml                   ← on push: go test ./... -race -count=1
-│       └── deploy.yml                 ← on push to main: build linux + scp + restart
+│       ├── test.yml                   ✓ BUILT — push → go test ./... -race
+│       │                                 spins up Postgres 15 in CI
+│       └── deploy.yml                 ✓ BUILT — push to main → build linux binary
+│                                          → scp to droplet → migrate → restart
+│                                          → health check
 │
 ├── deployments/
-│   ├── nginx.conf                     ← reverse proxy + SSL termination
-│   └── rentloop.service               ← systemd: auto-restart, non-root user
+│   ├── nginx.conf                     ✓ BUILT — reverse proxy + SSL termination
+│   │                                     copy to /etc/nginx/sites-available/
+│   └── rentloop.service               ✓ BUILT — systemd unit, auto-restart,
+│                                         non-root user, EnvironmentFile
 │
-├── .env.example
-├── .env
+├── Dockerfile                         ✓ BUILT — two-stage: builder + alpine
+│                                         for Railway/Render if needed later
+├── .dockerignore                      ✓ BUILT — excludes .env from image
+├── .env.example                       ← all required vars documented
+├── .env                               ← gitignored, never committed
 ├── .gitignore
 ├── Makefile
 ├── go.mod
 └── go.sum
+

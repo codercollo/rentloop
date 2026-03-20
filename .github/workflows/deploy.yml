@@ -1,0 +1,72 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Only one deploy runs at a time — no concurrent deploys
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [] # add test job name here once confident in CI
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      # ── Build a Linux binary ──────────────────────────────────────────────
+      - name: Build
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -ldflags="-s -w" -o rentloop ./cmd/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -ldflags="-s -w" -o migrate ./cmd/migrate
+
+      # ── Copy binaries and migrations to droplet ───────────────────────────
+      - name: Copy files to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          source: "rentloop,migrate,internal/db/migrations"
+          target: "/opt/rentloop"
+
+      # ── Run migrations then restart the service ───────────────────────────
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /opt/rentloop
+
+            # Run pending migrations
+            DATABASE_URL=$(grep DATABASE_URL /etc/rentloop.env | cut -d= -f2-) \
+              ./migrate
+            echo "migrations complete"
+
+            # Restart the systemd service
+            sudo systemctl restart rentloop
+
+            # Wait 5 seconds then health check
+            sleep 5
+            curl -sf http://localhost:8080/health | grep '"status":"ok"'
+            echo "deploy successful"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Deploy failed — check GitHub Actions logs"
+          # Add Twilio SMS alert here once production is live

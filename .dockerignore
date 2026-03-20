@@ -1,0 +1,9 @@
+.env
+.env.*
+.git
+.github
+*.md
+bin/
+tmp/
+.air.toml
+coverage.html

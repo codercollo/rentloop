@@ -1,0 +1,65 @@
+name: Test
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: rentloop
+          POSTGRES_PASSWORD: rentloop
+          POSTGRES_DB: rentloop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgres://rentloop:rentloop@localhost:5432/rentloop_test?sslmode=disable
+          # Fake values — unit tests use mocks, no real API calls
+          MPESA_CONSUMER_KEY: test
+          MPESA_CONSUMER_SECRET: test
+          MPESA_PAYBILL: 174379
+          MPESA_PASSKEY: test
+          AT_API_KEY: test
+          AT_USERNAME: sandbox
+          AT_WHATSAPP_NUMBER: +254700000000
+          AT_SMS_SENDER_ID: RentLoop
+          TWILIO_SID: ACtest
+          TWILIO_TOKEN: test
+          TWILIO_WHATSAPP_FROM: whatsapp:+14155238886
+          TWILIO_SMS_FROM: +14155238886
+          JWT_SECRET: testsecrettestsecrettestsecretXX
+          ACTIVATION_SECRET: testsecrettestsecrettestsecretXX
+          DO_SPACES_KEY: test
+          DO_SPACES_SECRET: test
+          DO_SPACES_BUCKET: test
+          DO_SPACES_REGION: fra1
+          DO_SPACES_ENDPOINT: https://fra1.digitaloceanspaces.com
+        run: go test ./... -race -count=1 -timeout 120s
+
+      - name: Build binary
+        run: CGO_ENABLED=0 GOOS=linux go build -o /dev/null ./cmd/server
