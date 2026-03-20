@@ -39,6 +39,12 @@ type Config struct {
 	ATWhatsAppNumber string
 	ATSMSSender      string
 
+	// Twilio Config
+	TwilioSID          string
+	TwilioToken        string
+	TwilioWhatsAppFrom string
+	TwilioSMSFrom      string
+
 	//Admin Auth
 	JWTSecret        string
 	ActivationSecret string
@@ -75,6 +81,11 @@ func Load() (*Config, error) {
 		ATUsername:       os.Getenv("AT_USERNAME"),
 		ATWhatsAppNumber: os.Getenv("AT_WHATSAPP_NUMBER"),
 		ATSMSSender:      os.Getenv("AT_SMS_SENDER_ID"),
+
+		TwilioSID:          os.Getenv("TWILIO_SID"),
+		TwilioToken:        os.Getenv("TWILIO_TOKEN"),
+		TwilioWhatsAppFrom: getEnv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
+		TwilioSMSFrom:      getEnv("TWILIO_SMS_FROM", "+14155238886"),
 
 		JWTSecret:        os.Getenv("JWT_SECRET"),
 		ActivationSecret: os.Getenv("ACTIVATION_SECRET"),

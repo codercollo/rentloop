@@ -1,4 +1,3 @@
-// Package main starts the RentLoop HTTP server.
 package main
 
 import (
@@ -28,28 +27,25 @@ import (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	slog.SetDefault(logger)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	cfg, err := config.Load()
 	if err != nil {
-		slog.Error("failed to load config", "error", err)
+		slog.Error("config", "error", err)
 		os.Exit(1)
 	}
 
 	pool, err := db.Connect(context.Background(), cfg.DatabaseURL)
 	if err != nil {
-		slog.Error("failed to connect to database", "error", err)
+		slog.Error("database", "error", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
 	slog.Info("database connection established")
 
 	// ── Repositories ──────────────────────────────────────────────────────────
-	// ledgerRepo satisfies three interfaces:
-	//   ledger.PaymentRepository  — InsertPayment, GetMonthlyTotal, GetUnit
-	//   matcher.Repository        — GetUnitByRef
-	//   mpesa.LandlordRepository  — GetByPaybill
+	// ledgerRepo satisfies ledger.PaymentRepository, matcher.Repository,
+	// and mpesa.LandlordRepository — one struct, three interfaces.
 	ledgerRepo := ledger.NewRepository(pool)
 	botRepo := bot.NewRepository(pool)
 
@@ -57,48 +53,46 @@ func main() {
 	ledgerSvc := ledger.NewService(ledgerRepo)
 	matcherSvc := matcher.New(ledgerRepo)
 
-	// ── Notifiers ─────────────────────────────────────────────────────────────
-	waSvc := notifier.NewWhatsApp(cfg.ATAPIKey, cfg.ATUsername, cfg.ATWhatsAppNumber)
-	smsSvc := notifier.NewSMS(cfg.ATAPIKey, cfg.ATUsername, cfg.ATSMSSender)
-
-	// combinedNotifier: landlord notification via SMS until AT WhatsApp provisioned
-	notify := &combinedNotifier{wa: waSvc, sms: smsSvc}
-
-	// botSender: bot replies via WhatsApp (404 expected until AT provisioned)
-	waSender := &botSender{wa: waSvc}
-
-	// smsSender: onboarding welcome messages via SMS fallback
-	smsSenderAdapter := &smsSender{sms: smsSvc}
+	// ── Twilio — WhatsApp + SMS ───────────────────────────────────────────────
+	// Single client handles both channels.
+	// WhatsApp → landlord notifications + bot replies
+	// SMS      → tenant receipts, reminders, onboarding
+	tw := notifier.NewTwilio(
+		cfg.TwilioSID,
+		cfg.TwilioToken,
+		cfg.TwilioWhatsAppFrom,
+		cfg.TwilioSMSFrom,
+	)
 
 	// ── Bot ───────────────────────────────────────────────────────────────────
-	botSvc := bot.NewService(botRepo, waSender, smsSvc)
+	// waSender  → bot replies go via Twilio WhatsApp
+	// smsSender → onboarding welcome messages go via Twilio SMS
+	botSvc := bot.NewService(botRepo, &waSender{tw}, tw)
 	botHandler := bot.NewHandler(botSvc)
 	smsHandler := bot.NewSMSHandler(botSvc)
 
-	// ── Onboarding ────────────────────────────────────────────────────────────
-	// Uses smsSender so welcome messages go via SMS, not WhatsApp
-	onboardingSvc := onboarding.NewService(botRepo, smsSenderAdapter, smsSvc)
+	onboardingSvc := onboarding.NewService(botRepo, &smsSender{tw}, tw)
 	botSvc.SetOnboarding(onboardingSvc)
 
-	// ── Cron — 6 PM daily digest ──────────────────────────────────────────────
+	// ── Cron ─────────────────────────────────────────────────────────────────
 	c := cron.New()
 	if err := botSvc.StartDigest(c); err != nil {
-		slog.Error("failed to register digest cron", "error", err)
+		slog.Error("cron", "error", err)
 		os.Exit(1)
 	}
 	c.Start()
 	defer c.Stop()
 
-	// ── M-Pesa handler ────────────────────────────────────────────────────────
+	// ── M-Pesa ───────────────────────────────────────────────────────────────
 	mpesaHandler := mpesa.NewHandler(
 		matcherSvc,
 		ledgerSvc,
-		notify,
+		&paymentNotifier{tw},
 		ledgerRepo,
 		cfg.IsDevelopment(),
 	)
 
-	// ── Router ────────────────────────────────────────────────────────────────
+	// ── Router ───────────────────────────────────────────────────────────────
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -108,7 +102,6 @@ func main() {
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `{"status":"ok"}`)
 	})
 
@@ -116,10 +109,9 @@ func main() {
 	r.Post("/bot/whatsapp", botHandler.Inbound)
 	r.Post("/bot/sms", smsHandler.Inbound)
 
-	// r.Mount("/billing", billingHandler.Routes())
-	// r.Mount("/admin",   adminHandler.Routes())
+	// pending: /billing, /admin
 
-	// ── HTTP Server ───────────────────────────────────────────────────────────
+	// ── Server ───────────────────────────────────────────────────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      r,
@@ -144,55 +136,44 @@ func main() {
 		slog.Error("server error", "error", err)
 		os.Exit(1)
 	case sig := <-quit:
-		slog.Info("shutdown signal received", "signal", sig)
+		slog.Info("shutdown", "signal", sig)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("forced shutdown", "error", err)
 		os.Exit(1)
 	}
-
 	slog.Info("server stopped cleanly")
 }
 
-// ── Adapters ──────────────────────────────────────────────────────────────────
+// ── Adapters ─────────────────────────────────────────────────────────────────
 
-// combinedNotifier satisfies mpesa.NotifierService.
-// Landlord notification uses SMS until AT WhatsApp is provisioned.
-// TODO: swap NotifyLandlord back to n.wa.NotifyLandlord when AT WhatsApp active.
-type combinedNotifier struct {
-	wa  *notifier.WhatsApp
-	sms *notifier.SMS
+// paymentNotifier satisfies mpesa.NotifierService.
+// Landlord → Twilio WhatsApp. Tenant → Twilio SMS.
+type paymentNotifier struct{ tw *notifier.Twilio }
+
+func (n *paymentNotifier) NotifyLandlord(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
+	return n.tw.NotifyLandlord(ctx, phone, p, unit)
 }
 
-func (n *combinedNotifier) NotifyLandlord(ctx context.Context, landlordPhone string, p *models.Payment, unit *models.Unit) error {
-	return n.sms.NotifyLandlordSMS(ctx, landlordPhone, p, unit)
+func (n *paymentNotifier) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
+	return n.tw.NotifyTenant(ctx, phone, p, unit)
 }
 
-func (n *combinedNotifier) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
-	return n.sms.NotifyTenant(ctx, phone, p, unit)
+// waSender adapts Twilio to bot.Sender — bot replies via WhatsApp.
+type waSender struct{ tw *notifier.Twilio }
+
+func (b *waSender) Send(ctx context.Context, to, msg string) error {
+	return b.tw.SendRaw(ctx, to, msg)
 }
 
-// botSender adapts *notifier.WhatsApp to bot.Sender.
-type botSender struct {
-	wa *notifier.WhatsApp
-}
+// smsSender adapts Twilio to bot.Sender — onboarding replies via SMS.
+type smsSender struct{ tw *notifier.Twilio }
 
-func (b *botSender) Send(ctx context.Context, to, message string) error {
-	return b.wa.SendRaw(ctx, to, message)
-}
-
-// smsSender adapts *notifier.SMS to bot.Sender (onboarding.Sender).
-// Used so onboarding welcome messages go via SMS, not WhatsApp.
-type smsSender struct {
-	sms *notifier.SMS
-}
-
-func (s *smsSender) Send(ctx context.Context, to, message string) error {
-	return s.sms.SendRaw(ctx, to, message)
+func (s *smsSender) Send(ctx context.Context, to, msg string) error {
+	return s.tw.SendRawSMS(ctx, to, msg)
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────

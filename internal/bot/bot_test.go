@@ -87,6 +87,20 @@ func (m *mockRepo) GetLandlordsWithUnpaid(_ context.Context, _ string) ([]models
 	return nil, nil
 }
 
+func (m *mockRepo) UpdateExpectedRent(_ context.Context, _, _ string, _ int) error {
+	return nil
+}
+
+func (m *mockRepo) ReplaceUnitTenant(_ context.Context, _ string, u models.Unit) (*models.Unit, error) {
+	u.ID = "u-replaced"
+	return &u, nil
+}
+
+func (m *mockRepo) InsertManualPayment(_ context.Context, p models.Payment) (*models.Payment, error) {
+	p.ID = "pay-manual"
+	return &p, nil
+}
+
 // ── Mock sender ───────────────────────────────────────────────────────────────
 
 type mockSender struct {
@@ -242,5 +256,38 @@ func TestHandle_UnknownCommand_ReturnsHelp(t *testing.T) {
 
 	if !strings.Contains(sender.lastMsg, "Commands") {
 		t.Errorf("expected help text for unknown command, got: %s", sender.lastMsg)
+	}
+}
+
+func TestHandle_SET_RENT_UpdatesRent(t *testing.T) {
+	sender := &mockSender{}
+	svc := newService(&mockRepo{landlord: activeLandlord(), units: unitsWithMixed()}, sender, &mockSMS{})
+
+	svc.Handle(context.Background(), "+254712345678", "SET RENT 4B 14000")
+
+	if !strings.Contains(sender.lastMsg, "updated") {
+		t.Errorf("expected rent updated confirmation, got: %s", sender.lastMsg)
+	}
+}
+
+func TestHandle_REPLACE_ReplacesTenant(t *testing.T) {
+	sender := &mockSender{}
+	svc := newService(&mockRepo{landlord: activeLandlord(), units: unitsWithMixed()}, sender, &mockSMS{})
+
+	svc.Handle(context.Background(), "+254712345678", "REPLACE 4B Grace Auma 0745678901 12500")
+
+	if !strings.Contains(sender.lastMsg, "replaced") {
+		t.Errorf("expected replacement confirmation, got: %s", sender.lastMsg)
+	}
+}
+
+func TestHandle_MARK_RecordsManualPayment(t *testing.T) {
+	sender := &mockSender{}
+	svc := newService(&mockRepo{landlord: activeLandlord(), units: unitsWithMixed()}, sender, &mockSMS{})
+
+	svc.Handle(context.Background(), "+254712345678", "MARK 4B PAID 12500 BANK")
+
+	if !strings.Contains(sender.lastMsg, "recorded") {
+		t.Errorf("expected payment recorded confirmation, got: %s", sender.lastMsg)
 	}
 }

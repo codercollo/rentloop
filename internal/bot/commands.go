@@ -1,9 +1,3 @@
-// Package bot implements landlord-facing command handling for the WhatsApp bot.
-//
-// It parses incoming text commands (e.g. LIST, REMIND, ADD UNIT) and executes
-// the corresponding business logic via the Service. The package focuses on
-// command routing, validation, and response formatting, delegating persistence
-// and messaging to injected interfaces.
 package bot
 
 import (
@@ -18,7 +12,6 @@ import (
 )
 
 // handleLandlord parses and executes a landlord command.
-// Returns the response string — the caller appends any grace warning.
 func (s *Service) handleLandlord(ctx context.Context, upper string, l *models.Landlord) string {
 	parts := strings.Fields(upper)
 	if len(parts) == 0 {
@@ -43,50 +36,40 @@ func (s *Service) handleLandlord(ctx context.Context, upper string, l *models.La
 		}
 		return s.cmdHistory(ctx, l, parts[1])
 	case "ADD":
-		// ADD UNIT 4B John Kamau 0712345678 12500
 		if len(parts) >= 2 && parts[1] == "UNIT" {
 			return s.cmdAddUnit(ctx, l, strings.Fields(upper)[2:])
 		}
 		return helpText()
 	case "REPLACE":
-		// REPLACE 4B Grace Auma 0745678901 12500
 		return s.cmdReplaceUnit(ctx, l, parts[1:])
 	case "SET":
-		// SET RENT 4B 14000
 		if len(parts) >= 2 && parts[1] == "RENT" {
 			return s.cmdSetRent(ctx, l, parts[2:])
 		}
 		return helpText()
 	case "MARK":
-		// MARK 4B PAID 12500 BANK
 		return s.cmdMark(ctx, l, parts[1:])
 	case "CLAIM":
-		// CLAIM TXN-ABC123 TO 4B
 		return s.cmdClaim(ctx, l, parts[1:])
-
 	case "JOIN":
 		if s.onboarding != nil {
 			s.onboarding.HandleJoin(ctx, l.WhatsAppPhone)
 			return ""
 		}
-		return "You are already registered. Send *ADD UNIT 4B John Kamau 0712345678 12500* or *BULK ADD* for CSV upload."
-
+		return "You are already registered.\n\nSend *ADD UNIT 4B John Kamau 0712345678 12500* to add a unit."
 	case "BULK":
 		if s.onboarding != nil {
 			s.onboarding.HandleBulkAdd(ctx, l.WhatsAppPhone, "")
 			return ""
 		}
 		return helpText()
-
 	case "HELP":
 		return helpText()
-
 	default:
 		return helpText()
 	}
 }
 
-// cmdList shows paid vs unpaid units for the current month.
 func (s *Service) cmdList(ctx context.Context, l *models.Landlord) string {
 	mk := monthKey()
 	units, err := s.repo.GetUnitsWithStatus(ctx, l.ID, mk)
@@ -113,10 +96,7 @@ func (s *Service) cmdList(ctx context.Context, l *models.Landlord) string {
 					u.Unit.UnitRef, u.Unit.TenantName, remaining,
 				))
 			} else {
-				unpaid = append(unpaid, fmt.Sprintf(
-					"✗ Unit %s — %s",
-					u.Unit.UnitRef, u.Unit.TenantName,
-				))
+				unpaid = append(unpaid, fmt.Sprintf("✗ Unit %s — %s", u.Unit.UnitRef, u.Unit.TenantName))
 			}
 		}
 	}
@@ -125,7 +105,6 @@ func (s *Service) cmdList(ctx context.Context, l *models.Landlord) string {
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*RentLoop — %s*\n", month)
 	fmt.Fprintf(sb, "Paid: %d/%d units · KES %d\n\n", len(paid), len(units), totalPaid)
-
 	if len(paid) > 0 {
 		sb.WriteString(strings.Join(paid, "\n"))
 		sb.WriteString("\n")
@@ -135,11 +114,9 @@ func (s *Service) cmdList(ctx context.Context, l *models.Landlord) string {
 		sb.WriteString(strings.Join(unpaid, "\n"))
 		sb.WriteString("\n\nReply *REMIND* to nudge unpaid tenants.")
 	}
-
 	return sb.String()
 }
 
-// cmdRemind sends SMS reminders to all unpaid tenants.
 func (s *Service) cmdRemind(ctx context.Context, l *models.Landlord) string {
 	mk := monthKey()
 	units, err := s.repo.GetUnitsWithStatus(ctx, l.ID, mk)
@@ -155,13 +132,7 @@ func (s *Service) cmdRemind(ctx context.Context, l *models.Landlord) string {
 		if u.IsPaid {
 			continue
 		}
-		err := s.sms.SendReminder(ctx,
-			u.Unit.TenantPhone,
-			u.Unit.TenantName,
-			u.Unit.UnitRef,
-			u.Unit.ExpectedRent,
-			month,
-		)
+		err := s.sms.SendReminder(ctx, u.Unit.TenantPhone, u.Unit.TenantName, u.Unit.UnitRef, u.Unit.ExpectedRent, month)
 		if err != nil {
 			failed = append(failed, u.Unit.UnitRef)
 		} else {
@@ -172,7 +143,6 @@ func (s *Service) cmdRemind(ctx context.Context, l *models.Landlord) string {
 	if reminded == 0 && len(failed) == 0 {
 		return "All units are paid for " + month + ". No reminders needed."
 	}
-
 	msg := fmt.Sprintf("Sent reminders to %d tenant(s).", reminded)
 	if len(failed) > 0 {
 		msg += fmt.Sprintf("\nFailed to reach: %s", strings.Join(failed, ", "))
@@ -180,7 +150,6 @@ func (s *Service) cmdRemind(ctx context.Context, l *models.Landlord) string {
 	return msg
 }
 
-// cmdTotal shows total collected vs expected for the current month.
 func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 	mk := monthKey()
 	units, err := s.repo.GetUnitsWithStatus(ctx, l.ID, mk)
@@ -201,13 +170,12 @@ func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 	)
 }
 
-// cmdReceipt resends the receipt for a specific unit.
 func (s *Service) cmdReceipt(ctx context.Context, l *models.Landlord, rawRef string) string {
 	ref := normaliseRef(rawRef)
 	unit, err := s.repo.GetUnitByRef(ctx, l.ID, ref)
 	if err != nil {
 		if errors.Is(err, models.ErrNotFound) {
-			return fmt.Sprintf("Unit %s not found. Check the unit reference and try again.", rawRef)
+			return fmt.Sprintf("Unit %s not found.", rawRef)
 		}
 		return "Could not find unit. Please try again."
 	}
@@ -225,12 +193,10 @@ func (s *Service) cmdReceipt(ctx context.Context, l *models.Landlord, rawRef str
 
 	return fmt.Sprintf(
 		"*Receipt — Unit %s*\nTenant: %s\nAmount: KES %d\nMonth: %s\nStatus: %s",
-		unit.UnitRef, unit.TenantName, h.Amount,
-		time.Now().Format("January 2006"), h.Status,
+		unit.UnitRef, unit.TenantName, h.Amount, time.Now().Format("January 2006"), h.Status,
 	)
 }
 
-// cmdHistory shows the last 3 months of payments for a unit.
 func (s *Service) cmdHistory(ctx context.Context, l *models.Landlord, rawRef string) string {
 	ref := normaliseRef(rawRef)
 	unit, err := s.repo.GetUnitByRef(ctx, l.ID, ref)
@@ -257,84 +223,100 @@ func (s *Service) cmdHistory(ctx context.Context, l *models.Landlord, rawRef str
 	return sb.String()
 }
 
-// cmdAddUnit adds a single unit from inline command.
-// Format: ADD UNIT 4B John Kamau 0712345678 12500
 func (s *Service) cmdAddUnit(ctx context.Context, l *models.Landlord, parts []string) string {
-	// parts after "ADD UNIT" = [ref, first, last..., phone, rent]
 	if len(parts) < 4 {
 		return "Usage: ADD UNIT <ref> <name> <phone> <rent>\nExample: ADD UNIT 4B John Kamau 0712345678 12500"
 	}
 
 	ref := normaliseRef(parts[0])
 	phone := parts[len(parts)-2]
-	rentS := parts[len(parts)-1]
+	rent := parseRent(parts[len(parts)-1])
 	name := strings.Join(parts[1:len(parts)-2], " ")
 
-	rent, err := strconv.Atoi(rentS)
-	if err != nil || rent <= 0 {
-		return fmt.Sprintf("Invalid rent amount: %s. Use a number e.g. 12500", rentS)
+	if rent <= 0 {
+		return fmt.Sprintf("Invalid rent amount: %s", parts[len(parts)-1])
 	}
 
-	unit := models.Unit{
+	inserted, err := s.repo.InsertUnit(ctx, models.Unit{
 		LandlordID:   l.ID,
 		UnitRef:      ref,
 		TenantName:   name,
 		TenantPhone:  phone,
 		ExpectedRent: rent,
-	}
-
-	inserted, err := s.repo.InsertUnit(ctx, unit)
+	})
 	if err != nil {
 		return fmt.Sprintf("Could not add unit %s. It may already exist.", ref)
 	}
 
 	return fmt.Sprintf(
-		"Unit %s added.\nTenant: %s\nPhone: %s\nRent: KES %d\n\n"+
-			"Their payment ref is: *%s*\nPaybill: %s",
+		"Unit %s added.\nTenant: %s\nPhone: %s\nRent: KES %d\n\nPaybill: %s · Account: *%s*",
 		inserted.UnitRef, inserted.TenantName, inserted.TenantPhone,
-		inserted.ExpectedRent, inserted.UnitRef, l.PaybillNumber,
+		inserted.ExpectedRent, l.PaybillNumber, inserted.UnitRef,
 	)
 }
 
-// cmdReplaceUnit soft-deletes and replaces a tenant on a unit.
+// cmdReplaceUnit deactivates the current tenant and inserts a new one.
 // Format: REPLACE 4B Grace Auma 0745678901 12500
 func (s *Service) cmdReplaceUnit(ctx context.Context, l *models.Landlord, parts []string) string {
 	if len(parts) < 4 {
 		return "Usage: REPLACE <unit> <name> <phone> <rent>\nExample: REPLACE 4B Grace Auma 0745678901 12500"
 	}
-	// For v1 treat same as ADD UNIT — ON CONFLICT DO NOTHING will surface the issue
-	// Full soft-delete implementation in v1.1
-	return s.cmdAddUnit(ctx, l, parts)
+
+	ref := normaliseRef(parts[0])
+	phone := parts[len(parts)-2]
+	rent := parseRent(parts[len(parts)-1])
+	name := strings.Join(parts[1:len(parts)-2], " ")
+
+	if rent <= 0 {
+		return fmt.Sprintf("Invalid rent amount: %s", parts[len(parts)-1])
+	}
+
+	inserted, err := s.repo.ReplaceUnitTenant(ctx, l.ID, models.Unit{
+		LandlordID:   l.ID,
+		UnitRef:      ref,
+		TenantName:   name,
+		TenantPhone:  phone,
+		ExpectedRent: rent,
+	})
+	if err != nil {
+		return fmt.Sprintf("Could not replace tenant on Unit %s. Please try again.", ref)
+	}
+
+	return fmt.Sprintf(
+		"Tenant replaced on Unit %s.\nNew tenant: %s\nPhone: %s\nRent: KES %d\n\n"+
+			"Previous payment history is preserved.",
+		inserted.UnitRef, inserted.TenantName, inserted.TenantPhone, inserted.ExpectedRent,
+	)
 }
 
-// cmdSetRent updates the expected rent for a unit.
+// cmdSetRent updates the expected rent for a unit in the database.
 // Format: SET RENT 4B 14000
 func (s *Service) cmdSetRent(ctx context.Context, l *models.Landlord, parts []string) string {
 	if len(parts) < 2 {
 		return "Usage: SET RENT <unit> <amount>\nExample: SET RENT 4B 14000"
 	}
+
 	ref := normaliseRef(parts[0])
-	rentS := parts[1]
+	rent := parseRent(parts[1])
 
-	rent, err := strconv.Atoi(rentS)
-	if err != nil || rent <= 0 {
-		return fmt.Sprintf("Invalid rent amount: %s", rentS)
+	if rent <= 0 {
+		return fmt.Sprintf("Invalid rent amount: %s", parts[1])
 	}
 
-	_, err = s.repo.GetUnitByRef(ctx, l.ID, ref)
-	if err != nil {
-		return fmt.Sprintf("Unit %s not found.", ref)
+	if err := s.repo.UpdateExpectedRent(ctx, l.ID, ref, rent); err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			return fmt.Sprintf("Unit %s not found.", ref)
+		}
+		return "Could not update rent. Please try again."
 	}
 
-	// Direct SQL update — we do this inline to avoid another interface method
-	// Full service method added in v1.1
 	return fmt.Sprintf(
-		"Rent for Unit %s updated to KES %d.\n"+
-			"_Note: takes effect from next billing cycle._", ref, rent,
+		"Rent updated.\nUnit %s → KES %d\n\n_Takes effect immediately for future payments._",
+		ref, rent,
 	)
 }
 
-// cmdMark manually logs a bank or cash payment.
+// cmdMark records a manual cash or bank payment in the ledger.
 // Format: MARK 4B PAID 12500 BANK
 func (s *Service) cmdMark(ctx context.Context, l *models.Landlord, parts []string) string {
 	if len(parts) < 4 {
@@ -342,11 +324,11 @@ func (s *Service) cmdMark(ctx context.Context, l *models.Landlord, parts []strin
 	}
 
 	ref := normaliseRef(parts[0])
-	amountS := parts[2]
+	amount := parseRent(parts[2])
+	method := strings.ToUpper(parts[3])
 
-	amount, err := strconv.Atoi(amountS)
-	if err != nil || amount <= 0 {
-		return fmt.Sprintf("Invalid amount: %s", amountS)
+	if amount <= 0 {
+		return fmt.Sprintf("Invalid amount: %s", parts[2])
 	}
 
 	unit, err := s.repo.GetUnitByRef(ctx, l.ID, ref)
@@ -354,28 +336,45 @@ func (s *Service) cmdMark(ctx context.Context, l *models.Landlord, parts []strin
 		return fmt.Sprintf("Unit %s not found.", ref)
 	}
 
-	// Generate a manual transaction ID
-	manualID := fmt.Sprintf("MANUAL-%s-%d", unit.UnitRef, time.Now().UnixMilli())
+	status := models.PaymentStatusPaid
+	if amount >= unit.ExpectedRent*2 {
+		status = models.PaymentStatusOver
+	} else if amount < unit.ExpectedRent {
+		status = models.PaymentStatusPartial
+	}
+
+	manualID := fmt.Sprintf("MANUAL-%s-%s-%d", unit.UnitRef, method, time.Now().UnixMilli())
+
+	recorded, err := s.repo.InsertManualPayment(ctx, models.Payment{
+		TransactionID: manualID,
+		UnitID:        unit.ID,
+		LandlordID:    l.ID,
+		TenantPhone:   unit.TenantPhone,
+		Amount:        amount,
+		Status:        status,
+		MonthKey:      monthKey(),
+	})
+	if err != nil {
+		return "Could not record payment. Please try again."
+	}
 
 	return fmt.Sprintf(
-		"*Manual payment recorded*\n"+
-			"Unit %s — %s\nAmount: KES %d\nRef: %s\n\n"+
-			"_This payment has been added to the ledger._",
-		unit.UnitRef, unit.TenantName, amount, manualID,
+		"*Manual payment recorded*\nUnit %s — %s\nAmount: KES %d\nMethod: %s\nStatus: %s\nRef: #%s",
+		unit.UnitRef, unit.TenantName,
+		recorded.Amount,
+		strings.Title(strings.ToLower(method)),
+		string(recorded.Status),
+		shortID(recorded.ID),
 	)
 }
 
-// cmdClaim assigns an unmatched transaction to a unit.
-// Format: CLAIM TXN-ABC123 TO 4B
 func (s *Service) cmdClaim(ctx context.Context, l *models.Landlord, parts []string) string {
-	// parts: [TXN-ABC123, TO, 4B]
 	if len(parts) < 3 || strings.ToUpper(parts[1]) != "TO" {
 		return "Usage: CLAIM <transaction-id> TO <unit>\nExample: CLAIM LHG31AA5TX TO 4B"
 	}
 
 	transID := parts[0]
-	rawRef := parts[2]
-	ref := normaliseRef(rawRef)
+	ref := normaliseRef(parts[2])
 
 	payment, err := s.repo.GetUnmatchedPayment(ctx, l.ID, transID)
 	if err != nil {
@@ -387,7 +386,7 @@ func (s *Service) cmdClaim(ctx context.Context, l *models.Landlord, parts []stri
 
 	unit, err := s.repo.GetUnitByRef(ctx, l.ID, ref)
 	if err != nil {
-		return fmt.Sprintf("Unit %s not found.", rawRef)
+		return fmt.Sprintf("Unit %s not found.", parts[2])
 	}
 
 	if err := s.repo.AssignPaymentToUnit(ctx, payment.ID, unit.ID); err != nil {
@@ -400,7 +399,16 @@ func (s *Service) cmdClaim(ctx context.Context, l *models.Landlord, parts []stri
 	)
 }
 
-// helpText returns the landlord command reference.
+// parseRent converts a string like "12500" or "12,500" to int.
+func parseRent(s string) int {
+	s = strings.ReplaceAll(s, ",", "")
+	n, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
+}
+
 func helpText() string {
 	return "*RentLoop Commands*\n\n" +
 		"*LIST* — paid vs unpaid this month\n" +
@@ -409,6 +417,7 @@ func helpText() string {
 		"*RECEIPT 4B* — resend receipt for a unit\n" +
 		"*HISTORY 4B* — last 3 months for a unit\n" +
 		"*ADD UNIT 4B John 0712345678 12500* — add unit\n" +
+		"*REPLACE 4B Grace Auma 0745678901 12500* — swap tenant\n" +
 		"*SET RENT 4B 14000* — update rent amount\n" +
 		"*MARK 4B PAID 12500 BANK* — log cash/bank payment\n" +
 		"*CLAIM TXN-ABC123 TO 4B* — assign unmatched payment\n" +

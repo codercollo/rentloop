@@ -37,6 +37,9 @@ type BotRepository interface {
 	AssignPaymentToUnit(ctx context.Context, paymentID, unitID string) error
 	InsertUnit(ctx context.Context, u models.Unit) (*models.Unit, error)
 	GetLandlordsWithUnpaid(ctx context.Context, monthKey string) ([]models.Landlord, error)
+	UpdateExpectedRent(ctx context.Context, landlordID, unitRef string, rent int) error
+	ReplaceUnitTenant(ctx context.Context, landlordID string, u models.Unit) (*models.Unit, error)
+	InsertManualPayment(ctx context.Context, p models.Payment) (*models.Payment, error)
 }
 
 // Service orchestrates all bot command logic.

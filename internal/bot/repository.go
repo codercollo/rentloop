@@ -371,3 +371,69 @@ func (r *Repository) GetLandlordsWithUnpaid(ctx context.Context, monthKey string
 	}
 	return results, rows.Err()
 }
+
+func (r *Repository) UpdateExpectedRent(ctx context.Context, landlordID, unitRef string, rent int) error {
+	tag, err := r.db.Exec(ctx, `
+        UPDATE units SET expected_rent = $1
+        WHERE  landlord_id = $2 AND unit_ref = $3 AND active = TRUE
+    `, rent, landlordID, unitRef)
+	if err != nil {
+		return fmt.Errorf("update expected rent: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ReplaceUnitTenant(ctx context.Context, landlordID string, u models.Unit) (*models.Unit, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	_, err = tx.Exec(ctx,
+		`UPDATE units SET active = FALSE WHERE landlord_id = $1 AND unit_ref = $2 AND active = TRUE`,
+		landlordID, u.UnitRef)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, fmt.Errorf("deactivate unit: %w", err)
+	}
+	var inserted models.Unit
+	err = tx.QueryRow(ctx, `
+        INSERT INTO units (landlord_id, unit_ref, tenant_name, tenant_phone, expected_rent)
+        VALUES ($1,$2,$3,$4,$5)
+        RETURNING id, landlord_id, unit_ref, tenant_name, tenant_phone,
+                  expected_rent, active, effective_from, created_at
+    `, landlordID, u.UnitRef, u.TenantName, u.TenantPhone, u.ExpectedRent,
+	).Scan(&inserted.ID, &inserted.LandlordID, &inserted.UnitRef, &inserted.TenantName,
+		&inserted.TenantPhone, &inserted.ExpectedRent, &inserted.Active,
+		&inserted.EffectiveFrom, &inserted.CreatedAt)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, fmt.Errorf("insert replacement: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+	return &inserted, nil
+}
+
+func (r *Repository) InsertManualPayment(ctx context.Context, p models.Payment) (*models.Payment, error) {
+	var inserted models.Payment
+	var scannedUnitID *string
+	err := r.db.QueryRow(ctx, `
+        INSERT INTO payments (transaction_id, unit_id, landlord_id, tenant_phone, amount, status, month_key, receipt_url, paid_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,'',NOW())
+        RETURNING id, transaction_id, unit_id, landlord_id, tenant_phone, amount, status, month_key, receipt_url, paid_at
+    `, p.TransactionID, p.UnitID, p.LandlordID, p.TenantPhone, p.Amount, string(p.Status), p.MonthKey,
+	).Scan(&inserted.ID, &inserted.TransactionID, &scannedUnitID, &inserted.LandlordID,
+		&inserted.TenantPhone, &inserted.Amount, &inserted.Status,
+		&inserted.MonthKey, &inserted.ReceiptURL, &inserted.PaidAt)
+	if err != nil {
+		return nil, fmt.Errorf("insert manual payment: %w", err)
+	}
+	if scannedUnitID != nil {
+		inserted.UnitID = *scannedUnitID
+	}
+	return &inserted, nil
+}

@@ -1,0 +1,30 @@
+// Delete the payments:$ psql "postgres://rentloop:rentloop@localhost:5432/rentloop?sslmode=disable"
+psql (17.7)
+WARNING: Console code page (437) differs from Windows code page (1252)
+         8-bit characters might not work correctly. See psql reference
+         page "Notes for Windows users" for details.
+Type "help" for help.
+
+rentloop=> DELETE FROM payments WHERE transaction_id IN ('TWTEST001', 'TWTEST002'); 
+DELETE 1
+
+// Run the test
+
+itsco@isotope MINGW64 ~/Desktop/rentloop (development)
+$ curl -X POST http://localhost:8080/mpesa/c2b/callback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "TransactionType": "Pay Bill",
+    "TransID": "TWTEST003",
+    "TransTime": "20260320120000",
+    "TransAmount": "10000.00",
+    "BusinessShortCode": "174379",
+    "BillRefNumber": "B01",
+    "MSISDN": "254741775492",
+    "FirstName": "Collins",
+    "LastName": "Maina"
+  }'
+{"ResultCode":"0","ResultDesc":"Accepted"}
+
+
+// 
