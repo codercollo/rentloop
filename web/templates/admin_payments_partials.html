@@ -1,0 +1,21 @@
+{{range .}}
+<div class="flex items-center justify-between px-6 py-3 border-b border-gray-800/50 hover:bg-gray-800/20 transition text-sm">
+  <span class="text-gray-400 text-xs w-28">{{.PaidAt.Format "02 Jan 15:04"}}</span>
+  <span class="font-medium w-32 truncate">{{.LandlordName}}</span>
+  <span class="font-mono text-indigo-400 text-xs w-16">{{.UnitRef}}</span>
+  <span class="font-medium w-28">KES {{.Amount}}</span>
+  <span class="w-20">
+    {{if eq .Status "paid"}}
+      <span class="px-2 py-0.5 bg-green-500/15 text-green-400 text-xs rounded-full">paid</span>
+    {{else if eq .Status "partial"}}
+      <span class="px-2 py-0.5 bg-yellow-500/15 text-yellow-400 text-xs rounded-full">partial</span>
+    {{else if eq .Status "unmatched"}}
+      <span class="px-2 py-0.5 bg-red-500/15 text-red-400 text-xs rounded-full">unmatched</span>
+    {{else}}
+      <span class="text-gray-500 text-xs">{{.Status}}</span>
+    {{end}}
+  </span>
+</div>
+{{else}}
+<p class="px-6 py-8 text-gray-500 text-sm text-center">No payments today yet.</p>
+{{end}}

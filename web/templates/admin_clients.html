@@ -1,0 +1,50 @@
+{{define "title"}}Clients — RentLoop{{end}}
+{{define "content"}}
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h2 class="text-2xl font-bold">Landlords</h2>
+    <p class="text-gray-500 text-sm mt-1">{{len .Landlords}} total</p>
+  </div>
+</div>
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-800">
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Name</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Phone</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Units</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Fee</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Status</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Since</th>
+        <th class="px-6 py-3"></th>
+      </tr>
+    </thead>
+    <tbody>
+    {{range .Landlords}}
+    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
+      <td class="px-6 py-4 font-medium">{{.Name}}</td>
+      <td class="px-6 py-4 text-gray-400 font-mono text-xs">{{.WhatsAppPhone}}</td>
+      <td class="px-6 py-4">{{.UnitCount}}</td>
+      <td class="px-6 py-4">
+        {{if .MonthlyFee}}<span class="text-emerald-400 font-medium">KES {{.MonthlyFee}}</span>
+        {{else}}<span class="text-gray-500">Free</span>{{end}}
+      </td>
+      <td class="px-6 py-4">
+        {{if eq (printf "%s" .SubscriptionStatus) "active"}}
+          <span class="px-2 py-0.5 bg-green-500/15 text-green-400 text-xs rounded-full">active</span>
+        {{else if eq (printf "%s" .SubscriptionStatus) "grace"}}
+          <span class="px-2 py-0.5 bg-yellow-500/15 text-yellow-400 text-xs rounded-full">grace</span>
+        {{else}}
+          <span class="px-2 py-0.5 bg-red-500/15 text-red-400 text-xs rounded-full">suspended</span>
+        {{end}}
+      </td>
+      <td class="px-6 py-4 text-gray-500 text-xs">{{.CreatedAt.Format "02 Jan 2006"}}</td>
+      <td class="px-6 py-4">
+        <a href="/admin/clients/{{.ID}}" class="text-indigo-400 hover:text-indigo-300 text-xs">View →</a>
+      </td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

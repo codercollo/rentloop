@@ -22,6 +22,7 @@ type AuthRepository interface {
 	GetAdminByEmail(ctx context.Context, email string) (*models.AdminUser, error)
 	ActivateAdmin(ctx context.Context, token string) error
 	GetAdminByID(ctx context.Context, id string) (*models.AdminUser, error)
+	ForceActivateByID(ctx context.Context, id string) error // ← add this line
 }
 
 // Service handles bcrypt hashing, JWT signing, and activation tokens.
@@ -93,6 +94,18 @@ func (s *Service) Activate(ctx context.Context, token string) error {
 		return fmt.Errorf("activate: %w", err)
 	}
 	return nil
+}
+
+// GetByEmail returns an admin user by email.
+// Used by the setup handler to retrieve the newly created admin.
+func (s *Service) GetByEmail(ctx context.Context, email string) (*models.AdminUser, error) {
+	return s.repo.GetAdminByEmail(ctx, email)
+}
+
+// ForceActivate bypasses the email token and immediately activates an account.
+// Only used during the one-time setup flow.
+func (s *Service) ForceActivate(ctx context.Context, adminID string) error {
+	return s.repo.ForceActivateByID(ctx, adminID)
 }
 
 // VerifyJWT parses and validates a JWT, returning the claims.

@@ -4,11 +4,13 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	cron "github.com/robfig/cron/v3"
 )
 
 // CronScheduler is satisfied by robfig/cron.Cron.
 type CronScheduler interface {
-	AddFunc(spec string, cmd func()) (interface{}, error)
+	AddFunc(spec string, cmd func()) (cron.EntryID, error)
 }
 
 // StartCron registers two billing cron jobs:

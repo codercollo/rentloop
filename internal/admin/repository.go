@@ -283,3 +283,9 @@ func (r *Repository) GetUnmatchedPayments(ctx context.Context) ([]PaymentRow, er
 	}
 	return results, rows.Err()
 }
+
+func (r *Repository) CountAdmins(ctx context.Context) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM admin_users`).Scan(&n)
+	return n, err
+}

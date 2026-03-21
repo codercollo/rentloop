@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,15 +12,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chi "github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/robfig/cron/v3"
 
+	"github.com/codercollo/rentloop/internal/admin"
+	"github.com/codercollo/rentloop/internal/auth"
+	"github.com/codercollo/rentloop/internal/billing"
 	"github.com/codercollo/rentloop/internal/bot"
 	"github.com/codercollo/rentloop/internal/config"
 	"github.com/codercollo/rentloop/internal/db"
 	"github.com/codercollo/rentloop/internal/ledger"
 	"github.com/codercollo/rentloop/internal/matcher"
+	appMiddleware "github.com/codercollo/rentloop/internal/middleware"
 	"github.com/codercollo/rentloop/internal/models"
 	"github.com/codercollo/rentloop/internal/mpesa"
 	"github.com/codercollo/rentloop/internal/notifier"
@@ -43,20 +48,18 @@ func main() {
 	defer pool.Close()
 	slog.Info("database connection established")
 
+	// ── Templates ─────────────────────────────────────────────────────────────
+	tmpl := template.Must(template.ParseGlob("web/templates/*.html"))
+
 	// ── Repositories ──────────────────────────────────────────────────────────
-	// ledgerRepo satisfies ledger.PaymentRepository, matcher.Repository,
-	// and mpesa.LandlordRepository — one struct, three interfaces.
 	ledgerRepo := ledger.NewRepository(pool)
 	botRepo := bot.NewRepository(pool)
 
-	// ── Services ──────────────────────────────────────────────────────────────
+	// ── Core services ─────────────────────────────────────────────────────────
 	ledgerSvc := ledger.NewService(ledgerRepo)
 	matcherSvc := matcher.New(ledgerRepo)
 
-	// ── Twilio — WhatsApp + SMS ───────────────────────────────────────────────
-	// Single client handles both channels.
-	// WhatsApp → landlord notifications + bot replies
-	// SMS      → tenant receipts, reminders, onboarding
+	// ── Twilio ────────────────────────────────────────────────────────────────
 	tw := notifier.NewTwilio(
 		cfg.TwilioSID,
 		cfg.TwilioToken,
@@ -65,8 +68,6 @@ func main() {
 	)
 
 	// ── Bot ───────────────────────────────────────────────────────────────────
-	// waSender  → bot replies go via Twilio WhatsApp
-	// smsSender → onboarding welcome messages go via Twilio SMS
 	botSvc := bot.NewService(botRepo, &waSender{tw}, tw)
 	botHandler := bot.NewHandler(botSvc)
 	smsHandler := bot.NewSMSHandler(botSvc)
@@ -74,10 +75,34 @@ func main() {
 	onboardingSvc := onboarding.NewService(botRepo, &smsSender{tw}, tw)
 	botSvc.SetOnboarding(onboardingSvc)
 
+	// ── Billing ───────────────────────────────────────────────────────────────
+	billingRepo := billing.NewRepository(pool)
+	billingSvc := billing.NewService(
+		billingRepo,
+		&waSender{tw},
+		cfg.BillingGraceDays,
+		cfg.SubscriptionPricePerUnit,
+		cfg.FreeTierUnitLimit,
+	)
+	billingHandler := billing.NewHandler(billingSvc)
+
+	// ── Auth ──────────────────────────────────────────────────────────────────
+	authRepo := auth.NewRepository(pool)
+	authSvc := auth.NewService(authRepo, cfg.JWTSecret, cfg.ActivationSecret)
+	authHandler := auth.NewHandler(authSvc, tmpl)
+
+	// ── Admin ─────────────────────────────────────────────────────────────────
+	adminRepo := admin.NewRepository(pool)
+	adminHandler := admin.NewHandler(adminRepo, tmpl)
+
 	// ── Cron ─────────────────────────────────────────────────────────────────
 	c := cron.New()
 	if err := botSvc.StartDigest(c); err != nil {
-		slog.Error("cron", "error", err)
+		slog.Error("digest cron", "error", err)
+		os.Exit(1)
+	}
+	if err := billingSvc.StartCron(c); err != nil {
+		slog.Error("billing cron", "error", err)
 		os.Exit(1)
 	}
 	c.Start()
@@ -87,29 +112,77 @@ func main() {
 	mpesaHandler := mpesa.NewHandler(
 		matcherSvc,
 		ledgerSvc,
-		&paymentNotifier{tw},
+		&paymentNotifier{tw, billingHandler},
 		ledgerRepo,
 		cfg.IsDevelopment(),
 	)
 
 	// ── Router ───────────────────────────────────────────────────────────────
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Recoverer)
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Recoverer)
 	r.Use(requestLogger)
-	r.Use(middleware.Timeout(30 * time.Second))
+	r.Use(chimw.Timeout(30 * time.Second))
+
+	// ── Public routes ─────────────────────────────────────────────────────────
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		tmpl.ExecuteTemplate(w, "landing.html", map[string]any{
+			"Year": time.Now().Year(),
+			"Commands": []struct{ Cmd, Desc string }{
+				{"LIST", "Paid vs unpaid this month"},
+				{"REMIND", "SMS all unpaid tenants"},
+				{"TOTAL", "Collected vs expected"},
+				{"RECEIPT 4B", "Resend receipt for a unit"},
+				{"HISTORY 4B", "Last 3 months for a unit"},
+				{"MARK 4B PAID 12500 BANK", "Log a cash/bank payment"},
+				{"CLAIM TXN-123 TO 4B", "Assign unmatched payment"},
+				{"ADD UNIT 4B John 0712345678 12500", "Add a unit"},
+			},
+		})
+	})
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"status":"ok"}`)
 	})
 
+	// Static files — compiled Tailwind CSS + any other assets
+	r.Handle("/static/*", http.StripPrefix("/static/",
+		http.FileServer(http.Dir("web/static"))))
+
+	// ── Webhooks ─────────────────────────────────────────────────────────────
 	r.Post("/mpesa/c2b/callback", mpesaHandler.Callback)
 	r.Post("/bot/whatsapp", botHandler.Inbound)
 	r.Post("/bot/sms", smsHandler.Inbound)
 
-	// pending: /billing, /admin
+	// ── Admin auth — public ───────────────────────────────────────────────────
+	r.Get("/admin/login", authHandler.ShowLogin)
+	r.Post("/admin/login", authHandler.Login)
+	r.Get("/admin/activate", authHandler.Activate)
+	r.Post("/admin/logout", authHandler.Logout)
+
+	// One-time setup — env-gated, self-disables after first admin is created
+	r.Get("/admin/setup", adminHandler.ShowSetup(cfg.AdminSetupSecret, authSvc))
+	r.Post("/admin/setup", adminHandler.DoSetup(cfg.AdminSetupSecret, authSvc))
+
+	// ── Admin dashboard — JWT protected ──────────────────────────────────────
+	r.Group(func(r chi.Router) {
+		r.Use(appMiddleware.RequireAdmin(authSvc))
+
+		r.Get("/admin/dashboard", adminHandler.Dashboard)
+		r.Get("/admin/clients", adminHandler.Clients)
+		r.Get("/admin/clients/{id}", adminHandler.ClientDetail)
+		r.Get("/admin/agents", adminHandler.Agents)
+		r.Get("/admin/payments", adminHandler.Payments)
+		r.Get("/admin/payments/unmatched", adminHandler.UnmatchedPayments)
+
+		// HTMX partial — dashboard payments feed
+		r.Get("/admin/payments/partial", func(w http.ResponseWriter, r *http.Request) {
+			payments, _ := adminRepo.GetRecentPayments(r.Context())
+			tmpl.ExecuteTemplate(w, "admin_payments_partial.html", payments)
+		})
+	})
 
 	// ── Server ───────────────────────────────────────────────────────────────
 	srv := &http.Server{
@@ -150,9 +223,13 @@ func main() {
 
 // ── Adapters ─────────────────────────────────────────────────────────────────
 
-// paymentNotifier satisfies mpesa.NotifierService.
-// Landlord → Twilio WhatsApp. Tenant → Twilio SMS.
-type paymentNotifier struct{ tw *notifier.Twilio }
+// paymentNotifier routes C2B callbacks:
+// RENTLOOP- refs → billing service
+// Unit refs       → landlord notification + tenant receipt
+type paymentNotifier struct {
+	tw      *notifier.Twilio
+	billing *billing.Handler
+}
 
 func (n *paymentNotifier) NotifyLandlord(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
 	return n.tw.NotifyLandlord(ctx, phone, p, unit)
@@ -162,14 +239,14 @@ func (n *paymentNotifier) NotifyTenant(ctx context.Context, phone string, p *mod
 	return n.tw.NotifyTenant(ctx, phone, p, unit)
 }
 
-// waSender adapts Twilio to bot.Sender — bot replies via WhatsApp.
+// waSender — bot replies via Twilio WhatsApp.
 type waSender struct{ tw *notifier.Twilio }
 
 func (b *waSender) Send(ctx context.Context, to, msg string) error {
 	return b.tw.SendRaw(ctx, to, msg)
 }
 
-// smsSender adapts Twilio to bot.Sender — onboarding replies via SMS.
+// smsSender — onboarding welcome messages via Twilio SMS.
 type smsSender struct{ tw *notifier.Twilio }
 
 func (s *smsSender) Send(ctx context.Context, to, msg string) error {
@@ -181,14 +258,14 @@ func (s *smsSender) Send(ctx context.Context, to, msg string) error {
 func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		ww := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
 		next.ServeHTTP(ww, r)
 		slog.Info("request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", ww.Status(),
 			"duration_ms", time.Since(start).Milliseconds(),
-			"request_id", middleware.GetReqID(r.Context()),
+			"request_id", chimw.GetReqID(r.Context()),
 		)
 	})
 }

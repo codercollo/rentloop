@@ -39,6 +39,13 @@ func (m *mockRepo) GetAdminByID(_ context.Context, _ string) (*models.AdminUser,
 	return m.admin, nil
 }
 
+func (m *mockRepo) ForceActivateByID(_ context.Context, _ string) error {
+	if m.admin != nil {
+		m.admin.Activated = true
+	}
+	return nil
+}
+
 const (
 	testJWTSecret        = "testsecrettestsecrettestsecretXX"
 	testActivationSecret = "activationsecretactivationsecre1"

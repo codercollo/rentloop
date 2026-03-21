@@ -1,1 +1,5 @@
 .env
+
+node_modules/
+
+web/static/css/*.css

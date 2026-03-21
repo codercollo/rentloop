@@ -94,3 +94,16 @@ func (r *Repository) GetAdminByID(ctx context.Context, id string) (*models.Admin
 	}
 	return &u, nil
 }
+
+// ForceActivateByID sets activated=TRUE without checking a token.
+// Used only by the setup handler.
+func (r *Repository) ForceActivateByID(ctx context.Context, id string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE admin_users SET activated = TRUE WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("force activate: %w", err)
+	}
+	return nil
+}

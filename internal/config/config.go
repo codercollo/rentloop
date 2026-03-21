@@ -60,6 +60,9 @@ type Config struct {
 	BillingGraceDays         int
 	SubscriptionPricePerUnit int
 	FreeTierUnitLimit        int
+
+	//Admin setup
+	AdminSetupSecret string
 }
 
 // Load reads environment varibles, validates required fields,
@@ -99,6 +102,8 @@ func Load() (*Config, error) {
 		BillingGraceDays:         getEnvInt("BILLING_GRACE_DAYS", 5),
 		SubscriptionPricePerUnit: getEnvInt("SUBSCRIPTION_PRICE_PER_UNIT", 50),
 		FreeTierUnitLimit:        getEnvInt("FREE_TIER_UNIT_LIMIT", 10),
+
+		AdminSetupSecret: os.Getenv("ADMIN_SETUP_SECRET"),
 	}
 	if err := cfg.validate(); err != nil {
 		return nil, err

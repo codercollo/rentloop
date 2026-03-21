@@ -1,0 +1,55 @@
+{{define "title"}}Dashboard — RentLoop{{end}}
+{{define "content"}}
+<div class="mb-8">
+  <h2 class="text-2xl font-bold">Dashboard</h2>
+</div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <p class="text-3xl font-bold">{{.Stats.TotalLandlords}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Total Landlords</p>
+  </div>
+  <div class="bg-gray-900 border border-green-500/20 rounded-xl p-5">
+    <p class="text-3xl font-bold text-green-400">{{.Stats.ActiveLandlords}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Active</p>
+  </div>
+  <div class="bg-gray-900 border border-yellow-500/20 rounded-xl p-5">
+    <p class="text-3xl font-bold text-yellow-400">{{.Stats.GraceLandlords}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Grace Period</p>
+  </div>
+  <div class="bg-gray-900 border border-red-500/20 rounded-xl p-5">
+    <p class="text-3xl font-bold text-red-400">{{.Stats.SuspendedLandlords}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Suspended</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <p class="text-3xl font-bold">{{.Stats.TotalUnits}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Total Units</p>
+  </div>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+    <p class="text-3xl font-bold">{{.Stats.PaymentsToday}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Payments Today</p>
+  </div>
+  <div class="bg-gray-900 border border-emerald-500/20 rounded-xl p-5">
+    <p class="text-3xl font-bold text-emerald-400">KES {{.Stats.RevenueToday}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">Collected Today</p>
+  </div>
+  <div class="bg-gray-900 border border-indigo-500/20 rounded-xl p-5">
+    <p class="text-3xl font-bold text-indigo-400">KES {{.Stats.MRR}}</p>
+    <p class="text-gray-500 text-xs uppercase tracking-wide mt-1">MRR This Month</p>
+  </div>
+</div>
+<div class="bg-gray-900 border border-gray-800 rounded-xl">
+  <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+    <h3 class="font-semibold">Recent Payments</h3>
+    <button hx-get="/admin/payments/partial"
+            hx-target="#payments-table"
+            hx-swap="innerHTML"
+            class="text-xs text-indigo-400 hover:text-indigo-300 transition">Refresh</button>
+  </div>
+  <div id="payments-table"
+       hx-get="/admin/payments/partial"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div class="p-6 text-gray-500 text-sm">Loading…</div>
+  </div>
+</div>
+{{end}}
