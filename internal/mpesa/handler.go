@@ -1,8 +1,5 @@
 // Package mpesa implements the HTTP handler and processing pipeline
 // for Safaricom Daraja C2B callbacks.
-//
-// It coordinates validation, unit matching, payment recording,
-// and outbound notifications using injected dependencies.
 package mpesa
 
 import (
@@ -12,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/codercollo/rentloop/internal/billing"
 	"github.com/codercollo/rentloop/internal/models"
 )
 
@@ -42,15 +40,17 @@ type Handler struct {
 	ledger    LedgerService
 	notifier  NotifierService
 	landlords LandlordRepository
+	billing   *billing.Handler // nil-safe: routes RENTLOOP- refs to billing service
 	isDev     bool
 }
 
-// NewHandler wires all dependencies. Called from main.go.
+// NewHandler wires all dependencies. billing may be nil in tests.
 func NewHandler(
 	matcher MatcherService,
 	ledger LedgerService,
 	notifier NotifierService,
 	landlords LandlordRepository,
+	billing *billing.Handler,
 	isDev bool,
 ) *Handler {
 	return &Handler{
@@ -58,17 +58,17 @@ func NewHandler(
 		ledger:    ledger,
 		notifier:  notifier,
 		landlords: landlords,
+		billing:   billing,
 		isDev:     isDev,
 	}
 }
 
 // Callback handles POST /mpesa/c2b/callback.
 //
-// Design constraints from Daraja:
+// Design constraints:
 //   - Must return HTTP 200 within 5 seconds or Safaricom retries.
-//   - All heavy work runs in a goroutine after the response is sent.
-//   - The transaction_id UNIQUE constraint in Postgres is the
-//     idempotency guard against duplicate callbacks.
+//   - All processing is async — response is sent before work starts.
+//   - transaction_id UNIQUE constraint guards against duplicate callbacks.
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	if err := ValidateIP(r, h.isDev); err != nil {
 		slog.Warn("mpesa callback: blocked IP", "error", err, "remote", r.RemoteAddr)
@@ -79,19 +79,13 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	var cb C2BCallback
 	if err := json.NewDecoder(r.Body).Decode(&cb); err != nil {
 		slog.Warn("mpesa callback: malformed JSON", "error", err)
-		writeJSON(w, http.StatusBadRequest, C2BResponse{
-			ResultCode: "1",
-			ResultDesc: "Bad Request",
-		})
+		writeJSON(w, http.StatusBadRequest, C2BResponse{ResultCode: "1", ResultDesc: "Bad Request"})
 		return
 	}
 
 	if err := ValidatePayload(&cb); err != nil {
 		slog.Warn("mpesa callback: invalid payload", "error", err, "trans_id", cb.TransID)
-		writeJSON(w, http.StatusUnprocessableEntity, C2BResponse{
-			ResultCode: "1",
-			ResultDesc: "Invalid payload",
-		})
+		writeJSON(w, http.StatusUnprocessableEntity, C2BResponse{ResultCode: "1", ResultDesc: "Invalid payload"})
 		return
 	}
 
@@ -102,20 +96,32 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		"msisdn", cb.MSISDN,
 	)
 
-	// Respond to Safaricom immediately — must be within 5 seconds.
-	// All processing happens asynchronously in the goroutine below.
 	writeJSON(w, http.StatusOK, successResponse)
-
 	go h.process(cb)
 }
 
-// process runs the full payment pipeline after the HTTP response is sent.
-// All errors are logged — nothing panics the server.
+// process runs the full pipeline after the HTTP response is sent.
 func (h *Handler) process(cb C2BCallback) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	log := slog.With("trans_id", cb.TransID, "ref", cb.BillRefNumber)
+
+	// ── Subscription payment — route to billing, skip rent ledger ─────────────
+	// RENTLOOP-{id} refs are landlord subscription payments.
+	// They must never enter the rent ledger.
+	if billing.IsSubscriptionPayment(cb.BillRefNumber) {
+		log.Info("process: subscription payment", "ref", cb.BillRefNumber)
+		amount, err := ParseAmount(cb.TransAmount)
+		if err != nil {
+			log.Error("process: subscription parse amount failed", "error", err)
+			return
+		}
+		if h.billing != nil {
+			h.billing.ProcessSubscription(cb.TransID, cb.BillRefNumber, amount)
+		}
+		return
+	}
 
 	// ── Resolve landlord from paybill ─────────────────────────────────────────
 	landlord, err := h.landlords.GetByPaybill(ctx, cb.BusinessShortCode)
@@ -127,11 +133,7 @@ func (h *Handler) process(cb C2BCallback) {
 	// ── Match account reference to a unit ─────────────────────────────────────
 	unit, err := h.matcher.Match(ctx, landlord.ID, cb.BillRefNumber)
 	if err != nil {
-		log.Warn("process: no matching unit",
-			"ref", cb.BillRefNumber,
-			"landlord_id", landlord.ID,
-			"error", err,
-		)
+		log.Warn("process: no matching unit", "landlord_id", landlord.ID, "error", err)
 		h.handleUnmatched(ctx, cb, landlord)
 		return
 	}
@@ -143,7 +145,7 @@ func (h *Handler) process(cb C2BCallback) {
 		return
 	}
 
-	// ── Build payment record ──────────────────────────────────────────────────
+	// ── Record in ledger ──────────────────────────────────────────────────────
 	payment := models.Payment{
 		TransactionID: cb.TransID,
 		UnitID:        unit.ID,
@@ -154,15 +156,12 @@ func (h *Handler) process(cb C2BCallback) {
 		PaidAt:        time.Now(),
 	}
 
-	// ── Record in ledger (idempotent via UNIQUE transaction_id) ───────────────
 	recorded, err := h.ledger.Record(ctx, payment)
 	if err != nil {
 		log.Error("process: ledger record failed", "error", err)
 		return
 	}
 
-	// nil recorded means the transaction_id already exists — duplicate callback.
-	// The UNIQUE constraint silently discarded it. Nothing more to do.
 	if recorded == nil {
 		log.Info("process: duplicate transaction skipped", "trans_id", cb.TransID)
 		return
@@ -175,21 +174,16 @@ func (h *Handler) process(cb C2BCallback) {
 		"status", recorded.Status,
 	)
 
-	// ── Notify landlord ───────────────────────────────────────────────────────
-	// Non-fatal: payment is already recorded safely. A notification failure
-	// must never prevent the tenant receipt from being sent.
+	// ── Notify landlord + tenant ──────────────────────────────────────────────
 	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, unit); err != nil {
 		log.Error("process: landlord notification failed", "error", err)
 	}
-
-	// ── Send receipt to tenant via SMS ────────────────────────────────────────
 	if err := h.notifier.NotifyTenant(ctx, cb.MSISDN, recorded, unit); err != nil {
 		log.Error("process: tenant receipt failed", "error", err)
 	}
 }
 
-// handleUnmatched records a payment that could not be matched to a unit
-// and alerts the landlord so they can claim it manually via CLAIM command.
+// handleUnmatched records an unrecognised payment and alerts the landlord.
 func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord *models.Landlord) {
 	log := slog.With("trans_id", cb.TransID, "ref", cb.BillRefNumber)
 
@@ -199,7 +193,7 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 		return
 	}
 
-	payment := models.Payment{
+	recorded, err := h.ledger.Record(ctx, models.Payment{
 		TransactionID: cb.TransID,
 		LandlordID:    landlord.ID,
 		TenantPhone:   cb.MSISDN,
@@ -207,30 +201,23 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 		MonthKey:      monthKey(cb.TransTime),
 		Status:        "unmatched",
 		PaidAt:        time.Now(),
-	}
-
-	recorded, err := h.ledger.Record(ctx, payment)
+	})
 	if err != nil {
 		log.Error("handleUnmatched: ledger record failed", "error", err)
 		return
 	}
-
-	// nil = duplicate — already handled, nothing to do
 	if recorded == nil {
 		return
 	}
 
-	log.Warn("handleUnmatched: payment recorded as unmatched",
-		"payment_id", recorded.ID,
-		"ref", cb.BillRefNumber,
-	)
+	log.Warn("handleUnmatched: recorded", "payment_id", recorded.ID)
 
 	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, nil); err != nil {
-		log.Error("handleUnmatched: landlord notification failed", "error", err)
+		log.Error("handleUnmatched: notify failed", "error", err)
 	}
 }
 
-// monthKey derives a YYYY-MM string from Safaricom's YYYYMMDDHHmmss format.
+// monthKey derives YYYY-MM from Safaricom's YYYYMMDDHHmmss format.
 func monthKey(transTime string) string {
 	if len(transTime) < 6 {
 		return time.Now().Format("2006-01")
@@ -238,7 +225,7 @@ func monthKey(transTime string) string {
 	return transTime[:4] + "-" + transTime[4:6]
 }
 
-// writeJSON encodes v as JSON and writes it with the given status code.
+// writeJSON encodes v as JSON with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

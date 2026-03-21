@@ -1,15 +1,3 @@
-// Package mpesa_test contains black-box tests for the mpesa package.
-//
-// The tests exercise only the exported API of the mpesa package,
-// ensuring the handler, validation logic, and helpers behave as
-// expected from an external consumer’s perspective.
-//
-// Dependencies such as Matcher, Ledger, Notifier, and LandlordRepo
-// are mocked to isolate behavior and verify interactions without
-// requiring real infrastructure.
-//
-// This approach helps enforce a clean public interface and prevents
-// reliance on internal implementation details.
 package mpesa_test
 
 import (
@@ -77,6 +65,17 @@ func (m *mockLandlordRepo) GetByPaybill(_ context.Context, _ string) (*models.La
 	return m.landlord, m.err
 }
 
+type slowMockLedger struct {
+	delay time.Duration
+}
+
+func (s *slowMockLedger) Record(_ context.Context, p models.Payment) (*models.Payment, error) {
+	time.Sleep(s.delay)
+	p.ID = "pay-slow"
+	p.Status = models.PaymentStatusPaid
+	return &p, nil
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 func validCallback() mpesa.C2BCallback {
@@ -93,9 +92,15 @@ func validCallback() mpesa.C2BCallback {
 	}
 }
 
-func newHandler(matcher mpesa.MatcherService, ledger mpesa.LedgerService,
-	notifier mpesa.NotifierService, repo mpesa.LandlordRepository) *mpesa.Handler {
-	return mpesa.NewHandler(matcher, ledger, notifier, repo, true) // isDev=true bypasses IP check
+// newHandler creates a test handler with billing=nil and isDev=true.
+// billing is nil in tests — the nil guard in handler.go prevents panics.
+func newHandler(
+	matcher mpesa.MatcherService,
+	ledger mpesa.LedgerService,
+	notifier mpesa.NotifierService,
+	repo mpesa.LandlordRepository,
+) *mpesa.Handler {
+	return mpesa.NewHandler(matcher, ledger, notifier, repo, nil, true)
 }
 
 func postCallback(t *testing.T, h *mpesa.Handler, body any) *httptest.ResponseRecorder {
@@ -125,7 +130,6 @@ func TestCallback_ValidPayload_Returns200(t *testing.T) {
 	)
 
 	rr := postCallback(t, h, validCallback())
-
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200 got %d", rr.Code)
 	}
@@ -140,13 +144,8 @@ func TestCallback_ValidPayload_Returns200(t *testing.T) {
 }
 
 func TestCallback_BlockedIP_Returns403(t *testing.T) {
-	h := mpesa.NewHandler(
-		&mockMatcher{},
-		&mockLedger{},
-		&mockNotifier{},
-		&mockLandlordRepo{},
-		false, // isDev=false — IP check is enforced
-	)
+	// isDev=false enforces IP check
+	h := mpesa.NewHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{}, nil, false)
 
 	b, _ := json.Marshal(validCallback())
 	req := httptest.NewRequest(http.MethodPost, "/mpesa/c2b/callback", bytes.NewReader(b))
@@ -177,11 +176,8 @@ func TestCallback_MalformedJSON_Returns400(t *testing.T) {
 
 func TestCallback_MissingTransID_Returns422(t *testing.T) {
 	cb := validCallback()
-	cb.TransID = "" // remove required field
-
-	h := newHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{})
-	rr := postCallback(t, h, cb)
-
+	cb.TransID = ""
+	rr := postCallback(t, newHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{}), cb)
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422 got %d", rr.Code)
 	}
@@ -190,10 +186,7 @@ func TestCallback_MissingTransID_Returns422(t *testing.T) {
 func TestCallback_MissingBillRef_Returns422(t *testing.T) {
 	cb := validCallback()
 	cb.BillRefNumber = ""
-
-	h := newHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{})
-	rr := postCallback(t, h, cb)
-
+	rr := postCallback(t, newHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{}), cb)
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422 got %d", rr.Code)
 	}
@@ -202,24 +195,19 @@ func TestCallback_MissingBillRef_Returns422(t *testing.T) {
 func TestCallback_ZeroAmount_Returns422(t *testing.T) {
 	cb := validCallback()
 	cb.TransAmount = "0.00"
-
-	h := newHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{})
-	rr := postCallback(t, h, cb)
-
+	rr := postCallback(t, newHandler(&mockMatcher{}, &mockLedger{}, &mockNotifier{}, &mockLandlordRepo{}), cb)
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Errorf("expected 422 got %d", rr.Code)
 	}
 }
 
 func TestCallback_RespondsBeforeProcessing(t *testing.T) {
-	// Ledger is slow — response must still arrive before processing finishes.
-	slowLedger := &slowMockLedger{delay: 100 * time.Millisecond}
 	landlord := &models.Landlord{ID: "ll-1"}
 	unit := &models.Unit{ID: "u-1", UnitRef: "4B"}
 
 	h := newHandler(
 		&mockMatcher{unit: unit},
-		slowLedger,
+		&slowMockLedger{delay: 100 * time.Millisecond},
 		&mockNotifier{},
 		&mockLandlordRepo{landlord: landlord},
 	)
@@ -231,17 +219,38 @@ func TestCallback_RespondsBeforeProcessing(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200 got %d", rr.Code)
 	}
-	// Response must arrive well before the slow ledger finishes.
 	if elapsed >= 50*time.Millisecond {
 		t.Errorf("handler took %v — should respond before goroutine finishes", elapsed)
+	}
+}
+
+func TestCallback_SubscriptionPayment_Returns200AndSkipsLedger(t *testing.T) {
+	// billing=nil is intentional in tests — nil guard prevents panic.
+	// The test confirms: subscription refs get 200 and bypass the ledger.
+	cb := validCallback()
+	cb.BillRefNumber = "RENTLOOP-accee42b"
+
+	ledger := &mockLedger{}
+	h := newHandler(&mockMatcher{}, ledger, &mockNotifier{}, &mockLandlordRepo{})
+
+	rr := postCallback(t, h, cb)
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200 got %d", rr.Code)
+	}
+
+	// Give the goroutine time to run
+	time.Sleep(20 * time.Millisecond)
+
+	// Ledger must NOT have been called for a subscription payment
+	if ledger.recorded != nil {
+		t.Error("subscription payment should not touch the rent ledger")
 	}
 }
 
 // ── Validator unit tests ───────────────────────────────────────────────────────
 
 func TestValidatePayload_AllFieldsMissing(t *testing.T) {
-	err := mpesa.ValidatePayload(&mpesa.C2BCallback{})
-	if err == nil {
+	if err := mpesa.ValidatePayload(&mpesa.C2BCallback{}); err == nil {
 		t.Error("expected error for empty payload")
 	}
 }
@@ -265,7 +274,6 @@ func TestParseAmount(t *testing.T) {
 		{"abc", 0, true},
 		{"", 0, true},
 	}
-
 	for _, tt := range tests {
 		got, err := mpesa.ParseAmount(tt.input)
 		if tt.wantErr {
@@ -281,17 +289,4 @@ func TestParseAmount(t *testing.T) {
 			t.Errorf("ParseAmount(%q): got %d want %d", tt.input, got, tt.expected)
 		}
 	}
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-type slowMockLedger struct {
-	delay time.Duration
-}
-
-func (s *slowMockLedger) Record(_ context.Context, p models.Payment) (*models.Payment, error) {
-	time.Sleep(s.delay)
-	p.ID = "pay-slow"
-	p.Status = models.PaymentStatusPaid
-	return &p, nil
 }
