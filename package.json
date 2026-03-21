@@ -1,0 +1,34 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "description": "> Automated rent collection and management for Kenyan landlords and property agents — powered by M-Pesa and WhatsApp.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "postcss web/src/input.css -o web/static/css/admin.css",
+    "watch": "postcss web/src/input.css -o web/static/css/admin.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2"
+  },
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codercollo/rentloop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/codercollo/rentloop/issues"
+  },
+  "homepage": "https://github.com/codercollo/rentloop#readme",
+  "devDependencies": {
+    "postcss-cli": "^11.0.1"
+  }
+}

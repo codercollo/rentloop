@@ -1,0 +1,36 @@
+{{define "title"}}Agents — RentLoop{{end}}
+{{define "content"}}
+<div class="mb-6">
+  <h2 class="text-2xl font-bold">Agents</h2>
+  <p class="text-gray-500 text-sm mt-1">{{len .Agents}} total</p>
+</div>
+<div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-800">
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Name</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Phone</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Landlords</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Units</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Fee</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Since</th>
+      </tr>
+    </thead>
+    <tbody>
+    {{range .Agents}}
+    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
+      <td class="px-6 py-4 font-medium">{{.Name}}</td>
+      <td class="px-6 py-4 text-gray-400 font-mono text-xs">{{.WhatsAppPhone}}</td>
+      <td class="px-6 py-4">{{.LandlordCount}}</td>
+      <td class="px-6 py-4">{{.UnitCount}}</td>
+      <td class="px-6 py-4">
+        {{if .MonthlyFee}}<span class="text-emerald-400 font-medium">KES {{.MonthlyFee}}</span>
+        {{else}}<span class="text-gray-500">Free</span>{{end}}
+      </td>
+      <td class="px-6 py-4 text-gray-500 text-xs">{{.CreatedAt.Format "02 Jan 2006"}}</td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
