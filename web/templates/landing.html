@@ -4,12 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RentLoop — Automated Rent Collection for Kenya</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap"
-      rel="stylesheet"
-    />
+
     <style>
       *,
       *::before,
@@ -20,19 +15,17 @@
       }
 
       :root {
-        --ink: #0a1f0f;
-        --ink-mid: #2d4a35;
-        --green: #0d7a3e;
-        --green-vivid: #00c85a;
-        --green-soft: #e6f5ec;
-        --green-pale: #f0faf4;
-        --muted: #617568;
-        --border: #d6e8db;
-        --cream: #fafcf8;
+        --green: #00a550;
+        --green-light: #e6f7ee;
+        --green-mid: #a8dfc0;
+        --green-dark: #007a3d;
+        --green-xdark: #005a2d;
+        --text: #0f1a12;
+        --muted: #5a6b5f;
+        --muted-light: #9aac9f;
+        --border: #e0e8e3;
+        --surface: #f5faf7;
         --white: #ffffff;
-        --whatsapp: #25d366;
-        --radius: 14px;
-        --radius-sm: 8px;
       }
 
       html {
@@ -40,31 +33,45 @@
       }
 
       body {
-        font-family: "DM Sans", sans-serif;
-        background: var(--cream);
-        color: var(--ink);
-        line-height: 1.6;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--white);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
         overflow-x: hidden;
       }
 
-      /* ─── ANIMATIONS ─── */
-      @keyframes fadeUp {
-        from {
-          opacity: 0;
-          transform: translateY(28px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+      /* ─── Nav ─── */
+      nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border-bottom: 1px solid var(--border);
+        padding: 0 2rem;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
+      .nav-logo {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: var(--green);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .nav-logo-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse-dot 2s ease infinite;
       }
       @keyframes pulse-dot {
         0%,
@@ -73,894 +80,676 @@
           transform: scale(1);
         }
         50% {
-          opacity: 0.6;
-          transform: scale(0.85);
+          opacity: 0.55;
+          transform: scale(0.8);
         }
       }
-      @keyframes slideInLeft {
-        from {
-          opacity: 0;
-          transform: translateX(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      @keyframes slideInRight {
-        from {
-          opacity: 0;
-          transform: translateX(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      @keyframes float {
-        0%,
-        100% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-8px);
-        }
-      }
-      @keyframes shimmer {
-        0% {
-          background-position: -200% center;
-        }
-        100% {
-          background-position: 200% center;
-        }
-      }
-
-      .anim-fade-up {
-        animation: fadeUp 0.7s ease both;
-      }
-      .anim-fade-in {
-        animation: fadeIn 0.5s ease both;
-      }
-      .delay-1 {
-        animation-delay: 0.1s;
-      }
-      .delay-2 {
-        animation-delay: 0.2s;
-      }
-      .delay-3 {
-        animation-delay: 0.3s;
-      }
-      .delay-4 {
-        animation-delay: 0.45s;
-      }
-      .delay-5 {
-        animation-delay: 0.6s;
-      }
-
-      /* ─── NAV ─── */
-      nav {
-        position: fixed;
-        top: 0;
-        width: 100%;
-        z-index: 100;
-        background: rgba(250, 252, 248, 0.88);
-        backdrop-filter: blur(12px);
-        border-bottom: 1px solid var(--border);
-        height: 68px;
+      .nav-links {
         display: flex;
         align-items: center;
-        padding: 0 clamp(1.25rem, 4vw, 3rem);
-        justify-content: space-between;
+        gap: 2rem;
       }
-
-      .nav-logo {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        font-family: "Playfair Display", serif;
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: var(--green);
-        letter-spacing: -0.02em;
-        text-decoration: none;
-      }
-      .nav-logo-mark {
-        width: 32px;
-        height: 32px;
-        background: var(--green);
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-      .nav-logo-mark svg {
-        width: 18px;
-        height: 18px;
-      }
-
-      .nav-right {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-      }
-      .nav-link {
+      .nav-links a {
         font-size: 0.875rem;
         font-weight: 500;
         color: var(--muted);
         text-decoration: none;
         transition: color 0.15s;
       }
-      .nav-link:hover {
-        color: var(--ink);
+      .nav-links a:hover {
+        color: var(--text);
       }
-
-      .btn {
+      .btn-nav {
         display: inline-flex;
         align-items: center;
-        gap: 0.45rem;
-        padding: 0.6rem 1.3rem;
-        border-radius: 9px;
+        gap: 0.4rem;
+        padding: 0.55rem 1.2rem;
+        background: var(--green);
+        color: #fff;
+        border-radius: 8px;
         font-size: 0.875rem;
         font-weight: 600;
         text-decoration: none;
-        transition: all 0.18s;
-        cursor: pointer;
-        border: none;
+        transition: all 0.15s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
-      .btn-green {
-        background: var(--green);
-        color: #fff;
-        box-shadow: 0 1px 3px rgba(13, 122, 62, 0.25);
-      }
-      .btn-green:hover {
-        background: #0a6535;
-        box-shadow: 0 4px 14px rgba(13, 122, 62, 0.35);
+      .btn-nav:hover {
+        background: var(--green-dark);
         transform: translateY(-1px);
-      }
-      .btn-ghost {
-        background: transparent;
-        color: var(--ink);
-        border: 1.5px solid var(--border);
-      }
-      .btn-ghost:hover {
-        border-color: var(--green);
-        color: var(--green);
-      }
-      .btn-lg {
-        padding: 0.875rem 1.75rem;
-        font-size: 0.95rem;
-        border-radius: 11px;
+        box-shadow: 0 4px 14px rgba(0, 165, 80, 0.25);
       }
 
-      /* ─── HERO ─── */
+      /* ─── Hero ─── */
       .hero {
-        min-height: 100vh;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0;
-        padding-top: 68px;
-        overflow: hidden;
+        padding: 128px 2rem 72px;
+        max-width: 700px;
+        margin: 0 auto;
+        text-align: center;
+        position: relative;
       }
-
-      .hero-left {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding: clamp(3rem, 6vw, 6rem) clamp(1.5rem, 5vw, 5rem);
-        padding-right: clamp(1.5rem, 3vw, 3rem);
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 400px;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(0, 165, 80, 0.07) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
       }
-
       .hero-badge {
         display: inline-flex;
         align-items: center;
-        gap: 0.6rem;
-        padding: 0.4rem 0.9rem;
-        background: var(--green-soft);
-        border: 1px solid var(--border);
+        gap: 0.5rem;
+        padding: 0.35rem 1rem;
+        background: var(--green-light);
+        border: 1px solid var(--green-mid);
         border-radius: 999px;
         font-size: 0.78rem;
+        color: var(--green-dark);
         font-weight: 600;
-        color: var(--green);
         margin-bottom: 1.75rem;
-        width: fit-content;
+        letter-spacing: 0.02em;
       }
-      .live-dot {
-        width: 7px;
-        height: 7px;
-        background: var(--green-vivid);
+      .badge-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--green);
         border-radius: 50%;
-        animation: pulse-dot 2s ease-in-out infinite;
+        animation: pulse-dot 2s ease infinite;
       }
-
-      .hero-h1 {
-        font-family: "Playfair Display", serif;
-        font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+      .hero h1 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(2.4rem, 5.5vw, 3.75rem);
         font-weight: 800;
         line-height: 1.1;
-        letter-spacing: -0.03em;
-        color: var(--ink);
-        margin-bottom: 1.4rem;
+        letter-spacing: -0.04em;
+        margin-bottom: 1.25rem;
+        color: var(--text);
       }
-      .hero-h1 .accent {
+      .hero h1 em {
+        font-style: normal;
         color: var(--green);
       }
-      .hero-h1 .underline-green {
-        position: relative;
-        display: inline-block;
-      }
-      .hero-h1 .underline-green::after {
-        content: "";
-        position: absolute;
-        bottom: 2px;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: var(--green-vivid);
-        border-radius: 2px;
-        opacity: 0.5;
-      }
-
-      .hero-sub {
-        font-size: 1.05rem;
+      .hero p {
+        font-size: 1.1rem;
         color: var(--muted);
         line-height: 1.75;
-        max-width: 430px;
         margin-bottom: 2.25rem;
+        max-width: 480px;
+        margin-left: auto;
+        margin-right: auto;
         font-weight: 300;
       }
-      .hero-sub strong {
-        color: var(--ink);
-        font-weight: 500;
-      }
-
-      .hero-ctas {
+      .hero-actions {
         display: flex;
         gap: 0.75rem;
+        justify-content: center;
         flex-wrap: wrap;
-        margin-bottom: 1.25rem;
+        margin-bottom: 1rem;
       }
-
-      .hero-note {
-        font-size: 0.8rem;
-        color: var(--muted);
-        display: flex;
+      .btn-hero {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.9rem 1.85rem;
+        background: var(--green);
+        color: #fff;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        box-shadow:
+          0 2px 0 var(--green-dark),
+          0 8px 24px rgba(0, 165, 80, 0.2);
+      }
+      .btn-hero:hover {
+        background: var(--green-dark);
+        transform: translateY(-2px);
+        box-shadow:
+          0 4px 0 var(--green-xdark),
+          0 12px 32px rgba(0, 165, 80, 0.3);
+      }
+      .btn-hero-ghost {
+        display: inline-flex;
         align-items: center;
         gap: 0.4rem;
+        padding: 0.9rem 1.85rem;
+        border: 1.5px solid var(--border);
+        color: var(--text);
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
-      .hero-note svg {
-        opacity: 0.5;
+      .btn-hero-ghost:hover {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-light);
+      }
+      .hero-note {
+        font-size: 0.8rem;
+        color: var(--muted-light);
       }
 
-      /* hero right panel */
-      .hero-right {
-        background: linear-gradient(
-          145deg,
-          #0d4f2e 0%,
-          #0a7038 50%,
-          #0d6b35 100%
-        );
+      /* ─── Stats ─── */
+      .stats-bar {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 1.25rem 2rem;
+      }
+      .stats-inner {
+        max-width: 680px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .stat {
+        text-align: center;
+      }
+      .stat-number {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--green);
+        letter-spacing: -0.03em;
+      }
+      .stat-label {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 0.1rem;
+      }
+
+      /* ─── Demo ─── */
+      .demo-section {
+        background: var(--surface);
+        padding: 5rem 2rem;
         position: relative;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 3rem 2rem;
       }
-      .hero-right::before {
+      .demo-section::before {
         content: "";
         position: absolute;
         inset: 0;
-        background-image:
+        background:
           radial-gradient(
-            ellipse at 30% 20%,
-            rgba(0, 200, 90, 0.15) 0%,
-            transparent 60%
+            circle at 15% 50%,
+            rgba(0, 165, 80, 0.04) 0%,
+            transparent 50%
           ),
           radial-gradient(
-            ellipse at 80% 80%,
-            rgba(0, 200, 90, 0.08) 0%,
+            circle at 85% 50%,
+            rgba(0, 165, 80, 0.04) 0%,
             transparent 50%
           );
+        pointer-events: none;
       }
-      .hero-right-noise {
-        position: absolute;
-        inset: 0;
-        opacity: 0.04;
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+      .demo-inner {
+        max-width: 420px;
+        margin: 0 auto;
+        position: relative;
+      }
+      .demo-header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      .demo-header h2 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.5rem;
+      }
+      .demo-header p {
+        font-size: 0.875rem;
+        color: var(--muted);
       }
 
-      /* WhatsApp mockup */
-      .phone-mockup {
-        position: relative;
-        z-index: 2;
-        width: 100%;
-        max-width: 300px;
-        animation: float 6s ease-in-out infinite;
-      }
-      .phone-frame {
-        background: #fff;
-        border-radius: 24px;
-        overflow: hidden;
+      .phone-shell {
+        background: #1c1c1e;
+        border-radius: 40px;
+        padding: 10px;
         box-shadow:
-          0 40px 80px rgba(0, 0, 0, 0.4),
-          0 0 0 1px rgba(255, 255, 255, 0.1);
+          0 40px 100px rgba(0, 0, 0, 0.22),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
       }
-      .phone-statusbar {
+      .phone-screen {
+        background: #fff;
+        border-radius: 32px;
+        overflow: hidden;
+      }
+      .phone-status {
         background: #075e54;
-        padding: 0.6rem 1rem;
+        padding: 0.65rem 1rem 0.5rem;
         display: flex;
         align-items: center;
-        gap: 0.6rem;
+        gap: 0.65rem;
       }
       .phone-avatar {
-        width: 32px;
-        height: 32px;
-        background: var(--whatsapp);
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
+        background: var(--green);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.7rem;
-        font-weight: 700;
+        font-size: 0.68rem;
+        font-weight: 800;
         color: #fff;
-      }
-      .phone-contact-info {
-        flex: 1;
+        flex-shrink: 0;
       }
       .phone-contact-name {
-        font-size: 0.8rem;
+        font-size: 0.875rem;
         font-weight: 600;
         color: #fff;
       }
       .phone-contact-status {
-        font-size: 0.65rem;
-        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.68rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin-top: 1px;
+      }
+      .phone-icons {
+        margin-left: auto;
+        display: flex;
+        gap: 0.8rem;
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 1.05rem;
       }
 
-      .phone-body {
-        background: #ece5dd;
-        padding: 0.75rem;
+      .chat-bg {
+        background-color: #ece5dd;
+        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23c4b9ae' fill-opacity='0.18'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+        padding: 1rem 0.85rem;
         display: flex;
         flex-direction: column;
-        gap: 0.6rem;
-        min-height: 320px;
-        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23b8b1a7' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        gap: 0.65rem;
+        min-height: 370px;
       }
-
-      .wa-msg {
-        max-width: 85%;
-        padding: 0.55rem 0.75rem;
-        border-radius: 10px;
-        font-size: 0.72rem;
-        line-height: 1.45;
-        position: relative;
-      }
-      .wa-msg.incoming {
-        background: #fff;
-        border-top-left-radius: 2px;
-        align-self: flex-start;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-      }
-      .wa-msg.outgoing {
-        background: #dcf8c6;
-        border-top-right-radius: 2px;
-        align-self: flex-end;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-      }
-      .wa-msg .wa-name {
-        font-weight: 700;
-        color: #075e54;
-        font-size: 0.68rem;
-      }
-      .wa-msg .wa-time {
-        font-size: 0.6rem;
-        color: #999;
-        text-align: right;
-        margin-top: 0.15rem;
-      }
-      .wa-msg .wa-paid {
-        color: #128c7e;
-        font-weight: 600;
-      }
-      .wa-msg .wa-amount {
-        font-weight: 700;
-        color: #0a0a0a;
-      }
-      .wa-msg .wa-status-line {
-        color: #128c7e;
-        font-size: 0.68rem;
-        margin-top: 0.15rem;
-      }
-
-      .wa-date-chip {
-        text-align: center;
-        font-size: 0.62rem;
-        color: #666;
-        background: rgba(0, 0, 0, 0.08);
-        border-radius: 999px;
-        padding: 0.2rem 0.7rem;
-        align-self: center;
-      }
-
-      .phone-input-bar {
-        background: #f0f0f0;
-        padding: 0.5rem 0.75rem;
+      .msg-row {
         display: flex;
-        align-items: center;
-        gap: 0.5rem;
+        align-items: flex-end;
+        gap: 0.4rem;
       }
-      .phone-input-field {
-        flex: 1;
-        background: #fff;
-        border-radius: 999px;
-        padding: 0.4rem 0.75rem;
-        font-size: 0.7rem;
-        color: #999;
-        border: none;
+      .msg-row.out {
+        flex-direction: row-reverse;
       }
-      .phone-send-btn {
-        width: 28px;
-        height: 28px;
-        background: #25d366;
+      .msg-av {
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
+        background: #25d366;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 0.52rem;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
       }
-
-      /* stat chips floating behind phone */
-      .stat-chip {
-        position: absolute;
-        z-index: 3;
+      .msg {
+        max-width: 80%;
+        padding: 0.6rem 0.85rem;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        line-height: 1.55;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+      .msg.in {
         background: #fff;
-        border-radius: 12px;
-        padding: 0.65rem 1rem;
-        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-        font-size: 0.75rem;
+        border-top-left-radius: 2px;
       }
-      .stat-chip-top {
-        top: 12%;
-        right: 5%;
-        animation: float 5s ease-in-out infinite;
-        animation-delay: -1.5s;
+      .msg.out {
+        background: #d9fdd3;
+        border-top-right-radius: 2px;
       }
-      .stat-chip-bottom {
-        bottom: 14%;
-        left: 3%;
-        animation: float 7s ease-in-out infinite;
-        animation-delay: -3s;
+      .msg b {
+        color: #075e54;
       }
-      .chip-label {
-        color: #888;
-        font-size: 0.65rem;
-        font-weight: 500;
-        margin-bottom: 0.15rem;
-      }
-      .chip-value {
+      .msg .amt {
         font-weight: 700;
-        color: var(--ink);
-        font-size: 0.9rem;
+        color: var(--text);
       }
-      .chip-delta {
-        color: var(--green);
-        font-size: 0.7rem;
+      .msg .t {
+        font-size: 0.62rem;
+        color: #aaa;
+        display: block;
+        text-align: right;
+        margin-top: 3px;
+      }
+      .msg .hint {
+        color: #25d366;
         font-weight: 600;
+        font-size: 0.73rem;
+        display: block;
+        margin-top: 0.25rem;
+      }
+      .typing {
+        display: flex;
+        gap: 3px;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: #fff;
+        border-radius: 10px;
+        width: fit-content;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+      .td {
+        width: 6px;
+        height: 6px;
+        background: #aaa;
+        border-radius: 50%;
+        animation: td 1.2s ease infinite;
+      }
+      .td:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .td:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes td {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        30% {
+          transform: translateY(-4px);
+          opacity: 1;
+        }
       }
 
-      /* ─── SECTION COMMON ─── */
-      .section-wrap {
-        padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 4vw, 3rem);
+      /* ─── How it works ─── */
+      .how-section {
+        padding: 6rem 2rem;
+        max-width: 900px;
+        margin: 0 auto;
       }
-      .section-center {
-        text-align: center;
-      }
-      .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
+      .section-label {
         font-size: 0.72rem;
         font-weight: 700;
         letter-spacing: 0.1em;
         text-transform: uppercase;
         color: var(--green);
-        margin-bottom: 0.9rem;
+        margin-bottom: 0.6rem;
+        display: block;
       }
-      .eyebrow-line {
-        width: 24px;
-        height: 2px;
-        background: var(--green);
-        border-radius: 1px;
-      }
-      .section-heading {
-        font-family: "Playfair Display", serif;
-        font-size: clamp(1.8rem, 3.5vw, 2.75rem);
-        font-weight: 700;
-        letter-spacing: -0.025em;
+      .section-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(1.6rem, 3vw, 2.1rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.75rem;
         line-height: 1.2;
-        color: var(--ink);
-        margin-bottom: 0.9rem;
       }
       .section-sub {
         color: var(--muted);
         font-size: 1rem;
         line-height: 1.7;
-        max-width: 520px;
         font-weight: 300;
       }
-      .section-sub-center {
-        margin-left: auto;
-        margin-right: auto;
-      }
 
-      /* ─── LOGOS / SOCIAL PROOF ─── */
-      .proof-strip {
-        background: var(--white);
-        border-top: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
-        padding: 1.5rem clamp(1.25rem, 4vw, 3rem);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 3rem;
-        flex-wrap: wrap;
-      }
-      .proof-item {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        font-size: 0.8rem;
-        color: var(--muted);
-        font-weight: 500;
-      }
-      .proof-icon {
-        width: 20px;
-        height: 20px;
-        opacity: 0.6;
-        flex-shrink: 0;
-      }
-
-      /* ─── HOW IT WORKS ─── */
-      .how-section {
-        background: var(--white);
-      }
-      .how-inner {
-        max-width: 1040px;
-        margin: 0 auto;
-      }
-
-      .how-grid {
+      .how-steps {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 1.5px;
-        background: var(--border);
-        border: 1.5px solid var(--border);
-        border-radius: 18px;
-        overflow: hidden;
-        margin-top: 3.5rem;
-      }
-      .how-step {
-        background: var(--white);
-        padding: clamp(1.5rem, 3vw, 2.5rem);
+        gap: 1.25rem;
+        margin-top: 2.75rem;
         position: relative;
-        overflow: hidden;
-        transition: background 0.2s;
       }
-      .how-step:hover {
-        background: var(--green-pale);
-      }
-      .how-step::after {
-        content: attr(data-num);
+      .how-steps::before {
+        content: "";
         position: absolute;
-        bottom: -0.5rem;
-        right: 0.75rem;
-        font-family: "Playfair Display", serif;
-        font-size: 5rem;
-        font-weight: 800;
-        color: var(--green-soft);
-        line-height: 1;
+        top: 26px;
+        left: calc(16.67% + 18px);
+        right: calc(16.67% + 18px);
+        height: 1px;
+        background: var(--green-mid);
         pointer-events: none;
       }
-      .step-icon {
-        width: 48px;
-        height: 48px;
-        background: var(--green-soft);
-        border-radius: 12px;
+      .step-card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.5rem;
+        transition: all 0.2s;
+      }
+      .step-card:hover {
+        box-shadow: 0 8px 32px rgba(0, 165, 80, 0.1);
+        border-color: var(--green-mid);
+        transform: translateY(-2px);
+      }
+      .step-num {
+        width: 36px;
+        height: 36px;
+        background: var(--green);
+        color: #fff;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 1.25rem;
-        transition: background 0.2s;
-      }
-      .how-step:hover .step-icon {
-        background: var(--green);
-      }
-      .how-step:hover .step-icon svg {
-        color: #fff;
-      }
-      .step-icon svg {
-        width: 22px;
-        height: 22px;
-        color: var(--green);
-        transition: color 0.2s;
-      }
-      .how-step h3 {
-        font-size: 1rem;
-        font-weight: 600;
-        color: var(--ink);
-        margin-bottom: 0.5rem;
-        position: relative;
-        z-index: 1;
-      }
-      .how-step p {
-        font-size: 0.875rem;
-        color: var(--muted);
-        line-height: 1.65;
-        position: relative;
-        z-index: 1;
-      }
-
-      /* ─── COMMANDS ─── */
-      .commands-section {
-        background: var(--cream);
-      }
-      .commands-inner {
-        max-width: 880px;
-        margin: 0 auto;
-      }
-
-      .commands-layout {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2.5rem;
-        margin-top: 3rem;
-        align-items: start;
-      }
-
-      .command-group-label {
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-        color: var(--green);
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 1.5px solid var(--border);
-      }
-
-      .command-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-        margin-bottom: 1.75rem;
-      }
-
-      .cmd-row {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.85rem;
-        padding: 0.75rem 1rem;
-        background: var(--white);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        cursor: default;
-        transition: all 0.17s;
-      }
-      .cmd-row:hover {
-        border-color: var(--green);
-        box-shadow: 0 2px 12px rgba(13, 122, 62, 0.08);
-        transform: translateX(3px);
-      }
-      .cmd-code {
-        font-family: "DM Mono", "Fira Code", monospace;
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: var(--green);
-        flex-shrink: 0;
-        min-width: 130px;
-      }
-      .cmd-desc {
-        font-size: 0.82rem;
-        color: var(--muted);
-        line-height: 1.4;
-      }
-
-      /* command demo panel */
-      .command-demo-panel {
-        background: var(--ink);
-        border-radius: 16px;
-        overflow: hidden;
-        box-shadow: 0 20px 50px rgba(10, 31, 15, 0.25);
-        position: sticky;
-        top: 90px;
-      }
-      .demo-panel-header {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 0.85rem 1.25rem;
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
-      .demo-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-      }
-      .demo-panel-title {
-        font-size: 0.75rem;
-        color: rgba(255, 255, 255, 0.5);
-        margin-left: 0.25rem;
-        font-weight: 500;
-      }
-      .demo-panel-body {
-        padding: 1.25rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.65rem;
-      }
-      .demo-line {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.75rem;
-      }
-      .demo-prompt {
-        color: var(--green-vivid);
-        font-size: 0.78rem;
-        font-weight: 600;
-        flex-shrink: 0;
-      }
-      .demo-text {
-        font-size: 0.78rem;
-        color: rgba(255, 255, 255, 0.75);
-        line-height: 1.5;
-      }
-      .demo-text .hi {
-        color: #fff;
-        font-weight: 500;
-      }
-      .demo-text .amt {
-        color: var(--green-vivid);
-        font-weight: 600;
-      }
-      .demo-text .dim {
-        color: rgba(255, 255, 255, 0.4);
-      }
-      .demo-divider {
-        height: 1px;
-        background: rgba(255, 255, 255, 0.07);
-        margin: 0.25rem 0;
-      }
-
-      /* ─── PROBLEM ─── */
-      .problem-section {
-        background: var(--white);
-      }
-      .problem-inner {
-        max-width: 900px;
-        margin: 0 auto;
-      }
-      .problem-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1.5rem;
-        margin-top: 3rem;
-      }
-      .problem-card {
-        padding: 1.75rem;
-        border-radius: var(--radius);
-        border: 1.5px solid var(--border);
-      }
-      .problem-card.before {
-        background: #fff5f5;
-        border-color: #fecaca;
-      }
-      .problem-card.after {
-        background: var(--green-soft);
-        border-color: var(--border);
-      }
-      .problem-card-label {
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 800;
+        font-size: 0.9rem;
         margin-bottom: 1.1rem;
       }
-      .problem-card.before .problem-card-label {
-        color: #dc2626;
+      .step-card h3 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
       }
-      .problem-card.after .problem-card-label {
-        color: var(--green);
-      }
-      .problem-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.6rem;
-        font-size: 0.875rem;
-        color: var(--ink);
-        margin-bottom: 0.7rem;
-        line-height: 1.45;
-      }
-      .problem-item-icon {
-        flex-shrink: 0;
-        margin-top: 1px;
+      .step-card p {
+        font-size: 0.845rem;
+        color: var(--muted);
+        line-height: 1.65;
       }
 
-      /* ─── PRICING ─── */
-      .pricing-section {
-        background: var(--cream);
+      /* ─── Commands ─── */
+      .commands-section {
+        background: var(--text);
+        padding: 5.5rem 2rem;
+        position: relative;
+        overflow: hidden;
       }
-      .pricing-inner {
+      .commands-section::before {
+        content: "";
+        position: absolute;
+        top: -40%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 800px;
+        height: 800px;
+        background: radial-gradient(
+          circle,
+          rgba(0, 165, 80, 0.08) 0%,
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+      .commands-inner {
+        max-width: 900px;
+        margin: 0 auto;
+        position: relative;
+      }
+      .commands-header {
+        margin-bottom: 2.75rem;
+      }
+      .commands-header .section-label {
+        color: var(--green);
+      }
+      .commands-header .section-title {
+        color: #fff;
+      }
+      .commands-header .section-sub {
+        color: rgba(255, 255, 255, 0.45);
+      }
+
+      .cmd-categories {
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+      }
+      .cat-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.3);
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.6rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .cmd-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 0.5rem;
+      }
+      .cmd-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        padding: 0.9rem 1.1rem;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0 1rem;
+        align-items: start;
+        transition: all 0.15s;
+      }
+      .cmd-card:hover {
+        background: rgba(0, 165, 80, 0.08);
+        border-color: rgba(0, 165, 80, 0.25);
+      }
+      .cmd-code {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--green);
+        white-space: nowrap;
+        letter-spacing: 0.02em;
+        padding-top: 1px;
+      }
+      .cmd-desc {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.6);
+        line-height: 1.5;
+      }
+      .cmd-ex {
+        margin-top: 0.3rem;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.71rem;
+        color: rgba(255, 255, 255, 0.28);
+        padding: 0.2rem 0.5rem;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 5px;
+        display: inline-block;
+      }
+      .cmd-note {
+        margin-top: 1.75rem;
+        padding: 1.1rem 1.35rem;
+        background: rgba(0, 165, 80, 0.08);
+        border: 1px solid rgba(0, 165, 80, 0.2);
+        border-radius: 10px;
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.65;
+      }
+      .cmd-note strong {
+        color: var(--green);
+      }
+
+      /* ─── Pricing ─── */
+      .pricing-section {
+        padding: 6rem 2rem;
         max-width: 760px;
         margin: 0 auto;
+      }
+      .pricing-header {
+        margin-bottom: 2.75rem;
       }
       .pricing-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1.25rem;
-        margin-top: 3rem;
+      }
+      @media (max-width: 540px) {
+        .pricing-grid {
+          grid-template-columns: 1fr;
+        }
       }
       .price-card {
         border: 1.5px solid var(--border);
-        border-radius: 18px;
+        border-radius: 16px;
         padding: 2rem;
-        background: var(--white);
         transition: all 0.2s;
       }
       .price-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 16px 40px rgba(13, 122, 62, 0.12);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+        transform: translateY(-2px);
       }
       .price-card.featured {
-        background: var(--green);
         border-color: var(--green);
+        background: linear-gradient(135deg, var(--green-light) 0%, #fff 100%);
+        position: relative;
+      }
+      .feat-badge {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--green);
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.3rem 0.85rem;
+        border-radius: 999px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .price-tier {
         font-size: 0.72rem;
         font-weight: 700;
-        letter-spacing: 0.08em;
         text-transform: uppercase;
-        margin-bottom: 1rem;
-      }
-      .price-card:not(.featured) .price-tier {
+        letter-spacing: 0.08em;
         color: var(--green);
+        margin-bottom: 0.75rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
-      .price-card.featured .price-tier {
-        color: rgba(255, 255, 255, 0.7);
-      }
-      .price-num {
-        font-family: "Playfair Display", serif;
-        font-size: 2.8rem;
+      .price-amt {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 2.5rem;
         font-weight: 800;
         letter-spacing: -0.04em;
-        line-height: 1;
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.2rem;
       }
-      .price-card:not(.featured) .price-num {
-        color: var(--ink);
-      }
-      .price-card.featured .price-num {
-        color: #fff;
-      }
-      .price-period {
-        font-size: 0.85rem;
+      .price-amt span {
+        font-size: 0.9rem;
         font-weight: 400;
-      }
-      .price-card:not(.featured) .price-period {
         color: var(--muted);
+        letter-spacing: 0;
       }
-      .price-card.featured .price-period {
-        color: rgba(255, 255, 255, 0.7);
-      }
-      .price-desc {
-        font-size: 0.8rem;
-        margin: 0.75rem 0 1.5rem;
-      }
-      .price-card:not(.featured) .price-desc {
+      .price-sub {
+        font-size: 0.82rem;
         color: var(--muted);
+        margin-bottom: 1.5rem;
       }
-      .price-card.featured .price-desc {
-        color: rgba(255, 255, 255, 0.75);
+      .price-div {
+        height: 1px;
+        background: var(--border);
+        margin-bottom: 1.25rem;
       }
       .price-features {
         list-style: none;
@@ -968,39 +757,34 @@
         flex-direction: column;
         gap: 0.65rem;
       }
-      .price-feature {
+      .price-features li {
         display: flex;
         gap: 0.6rem;
+        font-size: 0.845rem;
         align-items: flex-start;
-        font-size: 0.86rem;
-        line-height: 1.4;
       }
-      .price-card:not(.featured) .price-feature {
-        color: var(--ink);
-      }
-      .price-card.featured .price-feature {
-        color: rgba(255, 255, 255, 0.9);
-      }
-      .check {
+      .price-features li::before {
+        content: "✓";
+        color: var(--green);
+        font-weight: 700;
         flex-shrink: 0;
-        margin-top: 1px;
+        margin-top: 0.05rem;
       }
-      .price-note {
+      .pricing-note {
         text-align: center;
         color: var(--muted);
         font-size: 0.82rem;
-        margin-top: 1.5rem;
+        margin-top: 1.75rem;
+        line-height: 1.6;
+      }
+      .pricing-note strong {
+        color: var(--text);
       }
 
       /* ─── CTA ─── */
       .cta-section {
-        background: linear-gradient(
-          135deg,
-          #0a2d17 0%,
-          #0d5c2e 50%,
-          #0a4025 100%
-        );
-        padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 4vw, 3rem);
+        background: var(--green);
+        padding: 5.5rem 2rem;
         text-align: center;
         position: relative;
         overflow: hidden;
@@ -1009,951 +793,660 @@
         content: "";
         position: absolute;
         inset: 0;
-        background: radial-gradient(
-          ellipse at 50% 0%,
-          rgba(0, 200, 90, 0.15) 0%,
-          transparent 70%
-        );
+        background:
+          radial-gradient(
+            circle at 20% 50%,
+            rgba(255, 255, 255, 0.06) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 50%,
+            rgba(255, 255, 255, 0.06) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
       }
-      .cta-section > * {
+      .cta-inner {
         position: relative;
-        z-index: 1;
+        max-width: 520px;
+        margin: 0 auto;
       }
-      .cta-h2 {
-        font-family: "Playfair Display", serif;
-        font-size: clamp(1.8rem, 4vw, 3rem);
-        font-weight: 700;
+      .cta-section h2 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(1.75rem, 4vw, 2.5rem);
+        font-weight: 800;
         color: #fff;
-        letter-spacing: -0.025em;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
       }
-      .cta-p {
-        color: rgba(255, 255, 255, 0.65);
-        font-size: 1rem;
+      .cta-section p {
+        color: rgba(255, 255, 255, 0.75);
         margin-bottom: 2.25rem;
-        font-weight: 300;
+        font-size: 1rem;
+        line-height: 1.6;
       }
-      .btn-wa {
+      .btn-white {
         display: inline-flex;
         align-items: center;
-        gap: 0.7rem;
+        gap: 0.5rem;
         padding: 1rem 2.25rem;
-        background: var(--whatsapp);
-        color: #fff;
+        background: #fff;
+        color: var(--green);
         border-radius: 12px;
         font-weight: 700;
-        font-size: 1rem;
         text-decoration: none;
-        transition: all 0.2s;
-        box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
+        font-size: 1rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        transition: all 0.15s;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
       }
-      .btn-wa:hover {
-        background: #1eb455;
-        box-shadow: 0 8px 32px rgba(37, 211, 102, 0.5);
+      .btn-white:hover {
         transform: translateY(-2px);
-      }
-      .wa-icon {
-        width: 22px;
-        height: 22px;
+        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.1);
       }
 
-      /* ─── FOOTER ─── */
+      /* ─── Footer ─── */
       footer {
-        background: var(--white);
+        padding: 1.75rem 2rem;
         border-top: 1px solid var(--border);
-        padding: 2rem clamp(1.25rem, 4vw, 3rem);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        flex-wrap: gap;
+        flex-wrap: wrap;
         gap: 1rem;
       }
       .footer-brand {
-        font-family: "Playfair Display", serif;
-        font-size: 1.1rem;
-        font-weight: 700;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 800;
+        font-size: 1rem;
         color: var(--green);
       }
-      .footer-copy {
-        font-size: 0.78rem;
-        color: var(--muted);
+      .footer-text {
+        font-size: 0.8rem;
+        color: var(--muted-light);
       }
-      .footer-link {
+      .footer-links {
+        display: flex;
+        gap: 1.5rem;
+      }
+      .footer-links a {
+        font-size: 0.8rem;
         color: var(--muted);
-        font-size: 0.78rem;
         text-decoration: none;
         transition: color 0.15s;
       }
-      .footer-link:hover {
-        color: var(--green);
+      .footer-links a:hover {
+        color: var(--text);
       }
 
-      /* ─── RESPONSIVE ─── */
-      @media (max-width: 900px) {
-        .hero {
-          grid-template-columns: 1fr;
-          min-height: auto;
+      /* ─── Responsive ─── */
+      @media (max-width: 680px) {
+        nav {
+          padding: 0 1.25rem;
         }
-        .hero-right {
-          min-height: 400px;
-        }
-        .stat-chip-top {
-          top: 5%;
-          right: 3%;
-        }
-        .stat-chip-bottom {
+        .nav-links a:not(.btn-nav) {
           display: none;
         }
-        .how-grid {
+        .hero {
+          padding: 100px 1.25rem 56px;
+        }
+        .how-steps {
           grid-template-columns: 1fr;
         }
-        .problem-grid {
+        .how-steps::before {
+          display: none;
+        }
+        .cmd-grid {
           grid-template-columns: 1fr;
         }
-        .pricing-grid {
-          grid-template-columns: 1fr;
-          max-width: 400px;
-          margin-left: auto;
-          margin-right: auto;
+        footer {
+          flex-direction: column;
+          text-align: center;
         }
-        .commands-layout {
-          grid-template-columns: 1fr;
-        }
-        .command-demo-panel {
-          position: static;
+        .footer-links {
+          justify-content: center;
         }
       }
-      @media (max-width: 600px) {
-        .nav-right .nav-link {
-          display: none;
-        }
-        .hero-h1 {
-          font-size: 2.2rem;
-        }
+
+      /* ─── Scroll animations ─── */
+      .fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition:
+          opacity 0.5s ease,
+          transform 0.5s ease;
+      }
+      .fade-up.visible {
+        opacity: 1;
+        transform: translateY(0);
       }
     </style>
   </head>
   <body>
-    <!-- NAV -->
+    <!-- Nav -->
     <nav>
-      <a href="/" class="nav-logo">
-        <div class="nav-logo-mark">
-          <svg
-            viewBox="0 0 18 18"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M9 1L16 5V13L9 17L2 13V5L9 1Z"
-              stroke="white"
-              stroke-width="1.5"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M6 9L8 11L12 7"
-              stroke="white"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </div>
-        RentLoop
-      </a>
-      <div class="nav-right">
-        <a href="#how" class="nav-link">How it works</a>
-        <a href="#commands" class="nav-link">Commands</a>
-        <a href="#pricing" class="nav-link">Pricing</a>
+      <span class="nav-logo">RentLoop</span>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#commands">Commands</a>
+        <a href="#pricing">Pricing</a>
         <a
           href="https://wa.me/254700000000?text=JOIN"
           target="_blank"
-          class="btn btn-green"
+          class="btn-nav"
+          >Get started free →</a
         >
-          Get started free
-        </a>
       </div>
     </nav>
 
-    <!-- HERO -->
+    <!-- Hero -->
     <section class="hero">
-      <div class="hero-left">
-        <div class="hero-badge anim-fade-up">
-          <span class="live-dot"></span>
-          Live in Kenya · Powered by M-Pesa
-        </div>
-        <h1 class="hero-h1 anim-fade-up delay-1">
-          Rent collection that<br />
-          <span class="underline-green">works while</span><br />
-          <span class="accent">you sleep.</span>
-        </h1>
-        <p class="hero-sub anim-fade-up delay-2">
-          The moment a tenant pays M-Pesa, you know.
-          <strong>No statements. No spreadsheets. No phone calls.</strong>
-          Just an instant WhatsApp message — before you even pick up your phone.
-        </p>
-        <div class="hero-ctas anim-fade-up delay-3">
-          <a
-            href="https://wa.me/254700000000?text=JOIN"
-            target="_blank"
-            class="btn btn-green btn-lg"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"
-              />
-              <path
-                d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.029 18.88a9.895 9.895 0 01-4.741-1.21l-.339-.202-3.522.923.942-3.427-.221-.351A9.86 9.86 0 012.12 9.95C2.12 4.488 6.568.04 12.03.04c2.638 0 5.116 1.028 6.98 2.893a9.828 9.828 0 012.893 6.98c-.003 5.46-4.453 9.908-9.874 9.968z"
-              />
-            </svg>
-            Start free on WhatsApp
-          </a>
-          <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
-        </div>
-        <p class="hero-note anim-fade-up delay-4">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          Free up to 10 units. No app to install. Setup in 30 minutes.
-        </p>
+      <div class="hero-badge">
+        <span class="badge-dot"></span>Now live in Kenya — Beta
       </div>
-
-      <div class="hero-right">
-        <div class="hero-right-noise"></div>
-
-        <!-- stat chips -->
-        <div class="stat-chip stat-chip-top anim-fade-in delay-4">
-          <div class="chip-label">This month</div>
-          <div class="chip-value">KES 94,500</div>
-          <div class="chip-delta">↑ 12 of 15 paid</div>
-        </div>
-        <div class="stat-chip stat-chip-bottom anim-fade-in delay-5">
-          <div class="chip-label">Response time</div>
-          <div class="chip-value">&lt; 3 sec</div>
-          <div class="chip-delta">from M-Pesa to WhatsApp</div>
-        </div>
-
-        <!-- phone mockup -->
-        <div class="phone-mockup anim-fade-up delay-2">
-          <div class="phone-frame">
-            <div class="phone-statusbar">
-              <div class="phone-avatar">RL</div>
-              <div class="phone-contact-info">
-                <div class="phone-contact-name">RentLoop</div>
-                <div class="phone-contact-status">online</div>
-              </div>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="rgba(255,255,255,0.7)"
-                stroke-width="2"
-              >
-                <circle cx="12" cy="12" r="1" />
-                <circle cx="19" cy="12" r="1" />
-                <circle cx="5" cy="12" r="1" />
-              </svg>
-            </div>
-            <div class="phone-body">
-              <div class="wa-date-chip">01 April 2026</div>
-
-              <div class="wa-msg incoming">
-                <div class="wa-name">RentLoop</div>
-                <span class="wa-paid">✓ RentLoop</span><br />
-                John Kamau (Unit 4B) paid
-                <span class="wa-amount">KES 12,500</span>
-                <div class="wa-status-line">Paid in full · 08:02</div>
-                <div class="wa-time">08:02 ✓✓</div>
-              </div>
-
-              <div class="wa-msg incoming">
-                <div class="wa-name">RentLoop</div>
-                <span class="wa-paid">✓ RentLoop</span><br />
-                Mary Wanjiku (Unit 2A) paid
-                <span class="wa-amount">KES 8,000</span>
-                <div class="wa-status-line">Paid in full · 09:15</div>
-                <div class="wa-time">09:15 ✓✓</div>
-              </div>
-
-              <div class="wa-msg outgoing">
-                LIST
-                <div class="wa-time">18:00 ✓✓</div>
-              </div>
-
-              <div class="wa-msg incoming">
-                <div class="wa-name">RentLoop</div>
-                <strong>8 of 12 paid · KES 94,500</strong><br />
-                ✗ Peter Otieno 1C<br />
-                ✗ Grace Auma 3A...<br />
-                <span style="color: #128c7e; font-size: 0.68rem"
-                  >Reply REMIND</span
-                >
-                <div class="wa-time">18:00 ✓✓</div>
-              </div>
-
-              <div class="wa-msg outgoing">
-                REMIND
-                <div class="wa-time">18:00 ✓✓</div>
-              </div>
-
-              <div class="wa-msg incoming">
-                <div class="wa-name">RentLoop</div>
-                Sent reminders to <strong>4 unpaid tenants.</strong>
-                <div class="wa-time">18:00 ✓✓</div>
-              </div>
-            </div>
-            <div class="phone-input-bar">
-              <div class="phone-input-field">Message</div>
-              <div class="phone-send-btn">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
+      <h1>Rent collection on<br /><em>M-Pesa + WhatsApp.</em></h1>
+      <p>
+        The moment a tenant pays, you know. No statements. No spreadsheets. No
+        calls. Just one WhatsApp message — automatically.
+      </p>
+      <div class="hero-actions">
+        <a
+          href="https://wa.me/254700000000?text=JOIN"
+          target="_blank"
+          class="btn-hero"
+          >Start free on WhatsApp →</a
+        >
+        <a href="#how" class="btn-hero-ghost">See how it works</a>
       </div>
+      <p class="hero-note">
+        Free forever up to 10 units · No app · No spreadsheet
+      </p>
     </section>
 
-    <!-- PROOF STRIP -->
-    <div class="proof-strip">
-      <div class="proof-item">
-        <svg
-          class="proof-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-        M-Pesa Daraja C2B
-      </div>
-      <div class="proof-item">
-        <svg class="proof-icon" viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"
-          />
-        </svg>
-        WhatsApp + SMS
-      </div>
-      <div class="proof-item">
-        <svg
-          class="proof-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-          <polyline points="17 6 23 6 23 12" />
-        </svg>
-        Real-time webhooks
-      </div>
-      <div class="proof-item">
-        <svg
-          class="proof-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <ellipse cx="12" cy="5" rx="9" ry="3" />
-          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-        </svg>
-        PostgreSQL ledger
-      </div>
-      <div class="proof-item">
-        <svg
-          class="proof-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-        Idempotent payments
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stats-inner">
+        <div class="stat">
+          <div class="stat-number">3s</div>
+          <div class="stat-label">Payment to notification</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">0</div>
+          <div class="stat-label">Apps to install</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">KES 50</div>
+          <div class="stat-label">Per unit per month</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">M-Pesa native</div>
+        </div>
       </div>
     </div>
 
-    <!-- HOW IT WORKS -->
-    <section id="how" class="how-section section-wrap">
-      <div class="how-inner">
-        <div class="section-center">
-          <p class="eyebrow">
-            <span class="eyebrow-line"></span>How it works<span
-              class="eyebrow-line"
-            ></span>
-          </p>
-          <h2 class="section-heading">Three steps. No app. Just WhatsApp.</h2>
-          <p class="section-sub section-sub-center">
-            Built around how Kenyan landlords and tenants already use M-Pesa —
-            not how a Western product assumes they do.
+    <!-- Demo -->
+    <section class="demo-section">
+      <div class="demo-inner fade-up">
+        <div class="demo-header">
+          <span class="section-label">Live demo</span>
+          <h2>What the 1st looks like now</h2>
+          <p>Your WhatsApp on rent day — without lifting a finger</p>
+        </div>
+        <div class="phone-shell">
+          <div class="phone-screen">
+            <div class="phone-status">
+              <div class="phone-avatar">RL</div>
+              <div style="flex: 1">
+                <div class="phone-contact-name">RentLoop</div>
+                <div class="phone-contact-status">● online</div>
+              </div>
+              <div class="phone-icons">📞 ⋮</div>
+            </div>
+            <div class="chat-bg">
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  <b>✓ RentLoop</b><br />John Kamau (Unit 4B) paid
+                  <span class="amt">KES 12,500</span><br />Status: Paid in
+                  full<span class="t">08:02 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  <b>✓ RentLoop</b><br />Mary Wanjiku (Unit 2A) paid
+                  <span class="amt">KES 8,000</span><br />Status: Paid in
+                  full<span class="t">09:15 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  8 of 12 units paid · <span class="amt">KES 94,500</span
+                  ><br /><span style="color: #888; font-size: 0.72rem"
+                    >Unpaid: Peter Otieno 1C, Grace Auma 3A...</span
+                  ><span class="hint">Reply REMIND to nudge them →</span
+                  ><span class="t">18:00 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row out">
+                <div class="msg out">REMIND<span class="t">18:01 ✓✓</span></div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  Sent reminders to <b>4 unpaid tenants.</b
+                  ><span class="t">18:01 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row">
+                <div style="width: 24px"></div>
+                <div class="typing">
+                  <div class="td"></div>
+                  <div class="td"></div>
+                  <div class="td"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how">
+      <div class="how-section fade-up">
+        <div style="max-width: 480px">
+          <span class="section-label">How it works</span>
+          <h2 class="section-title">No app. No login.<br />Just WhatsApp.</h2>
+          <p class="section-sub">
+            Everything runs through the messaging app you already have open all
+            day.
           </p>
         </div>
-        <div class="how-grid">
-          <div class="how-step" data-num="1">
-            <div class="step-icon">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <line x1="2" y1="10" x2="22" y2="10" />
-              </svg>
-            </div>
-            <h3>Tenant pays M-Pesa Paybill</h3>
+        <div class="how-steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <h3>Tenant pays M-Pesa</h3>
             <p>
-              Tenant sends rent to your existing Paybill, using their unit
-              number as the account reference — exactly as they do today.
+              Tenant sends rent to your existing Paybill using their unit
+              reference (e.g. <strong>4B</strong>) as the account number.
               Nothing changes for them.
             </p>
           </div>
-          <div class="how-step" data-num="2">
-            <div class="step-icon">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.63A2 2 0 012 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 14z"
-                />
-              </svg>
-            </div>
-            <h3>You get notified in under 3 seconds</h3>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <h3>Both get notified instantly</h3>
             <p>
-              Safaricom's M-Pesa callback hits RentLoop. Payment is matched,
-              recorded, and a WhatsApp notification is sent to you. The tenant
-              gets an SMS receipt. All automatic.
+              Within 3 seconds you receive a WhatsApp notification. The tenant
+              gets an SMS receipt. Automatic. Every payment.
             </p>
           </div>
-          <div class="how-step" data-num="3">
-            <div class="step-icon">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-                />
-              </svg>
-            </div>
-            <h3>Manage everything from WhatsApp</h3>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <h3>Manage from WhatsApp</h3>
             <p>
-              Type LIST to see who's paid. Type REMIND to nudge everyone who
-              hasn't. No login. No URL. No spreadsheet. The app you already have
-              open is the entire product.
+              Type <strong>LIST</strong> to see who has paid. Type
+              <strong>REMIND</strong> to nudge everyone who hasn't. No login. No
+              URL.
             </p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- PROBLEM / SOLUTION -->
-    <section class="problem-section section-wrap">
-      <div class="problem-inner">
-        <div class="section-center" style="margin-bottom: 0">
-          <p class="eyebrow">
-            <span class="eyebrow-line"></span>The problem<span
-              class="eyebrow-line"
-            ></span>
-          </p>
-          <h2 class="section-heading">Every landlord knows this morning.</h2>
-          <p class="section-sub section-sub-center">
-            The 1st of the month used to mean 2–4 hours of manual work. It
-            doesn't have to.
-          </p>
-        </div>
-        <div class="problem-grid">
-          <div class="problem-card before">
-            <div class="problem-card-label">Before RentLoop</div>
-            <div class="problem-item">
-              <span class="problem-item-icon">❌</span>
-              Open M-Pesa statement, scroll through 40+ transactions
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">❌</span>
-              Manually match each payment to a tenant name
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">❌</span>
-              Write down in a notebook who has and hasn't paid
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">❌</span>
-              Call or message each unpaid tenant individually
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">❌</span>
-              Repeat for every landlord if you're an agent
-            </div>
-            <div
-              class="problem-item"
-              style="margin-top: 0.5rem; font-weight: 600; color: #dc2626"
-            >
-              <span class="problem-item-icon">⏱</span>
-              2–4 hours. Every single month.
-            </div>
-          </div>
-          <div class="problem-card after">
-            <div class="problem-card-label">With RentLoop</div>
-            <div class="problem-item">
-              <span class="problem-item-icon">✅</span>
-              WhatsApp notification arrives the moment rent is paid
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">✅</span>
-              Matching is automatic — no statement needed
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">✅</span>
-              Type LIST to see every unit's status instantly
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">✅</span>
-              Type REMIND — every unpaid tenant is nudged automatically
-            </div>
-            <div class="problem-item">
-              <span class="problem-item-icon">✅</span>
-              Agents get a full portfolio view in one place
-            </div>
-            <div
-              class="problem-item"
-              style="margin-top: 0.5rem; font-weight: 600; color: var(--green)"
-            >
-              <span class="problem-item-icon">⚡</span>
-              Under 3 minutes. Every single month.
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- COMMANDS -->
-    <section id="commands" class="commands-section section-wrap">
-      <div class="commands-inner">
-        <div class="section-center">
-          <p class="eyebrow">
-            <span class="eyebrow-line"></span>Commands<span
-              class="eyebrow-line"
-            ></span>
-          </p>
-          <h2 class="section-heading">Your entire office in WhatsApp.</h2>
-          <p class="section-sub section-sub-center">
-            Every management task available as a simple message. No menus. No UI
-            to learn.
+    <!-- Commands -->
+    <section id="commands" class="commands-section">
+      <div class="commands-inner fade-up">
+        <div class="commands-header">
+          <span class="section-label">WhatsApp commands</span>
+          <h2 class="section-title">Everything from one message</h2>
+          <p class="section-sub">
+            Send any command in capitals to your RentLoop WhatsApp number. No
+            login. No URL. No app.
           </p>
         </div>
 
-        <div class="commands-layout">
+        <div class="cmd-categories">
           <div>
-            <div class="command-group-label">Landlord commands</div>
-            <div class="command-list">
-              <div class="cmd-row">
-                <code class="cmd-code">LIST</code>
-                <span class="cmd-desc"
-                  >Paid vs unpaid for the current month — full unit
-                  breakdown</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">TOTAL</code>
-                <span class="cmd-desc"
-                  >Total collected vs expected, and outstanding balance</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">REMIND</code>
-                <span class="cmd-desc"
-                  >Sends an SMS reminder to every unpaid tenant instantly</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">RECEIPT 4B</code>
-                <span class="cmd-desc"
-                  >Resend the payment receipt for a specific unit</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">HISTORY 4B</code>
-                <span class="cmd-desc"
-                  >Last 3 months of payment history for a unit</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">MARK 4B PAID 12500 CASH</code>
-                <span class="cmd-desc"
-                  >Log a cash or bank payment manually to the ledger</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">ADD UNIT 4B John 0712… 12500</code>
-                <span class="cmd-desc"
-                  >Register a new unit with tenant details and expected
-                  rent</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">REPLACE 4B Grace 0745… 12500</code>
-                <span class="cmd-desc"
-                  >Swap to a new tenant — payment history preserved</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">SET RENT 4B 14000</code>
-                <span class="cmd-desc"
-                  >Update expected rent — takes effect immediately</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">CLAIM TXN-ABC TO 4B</code>
-                <span class="cmd-desc"
-                  >Assign an unmatched payment to the correct unit</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">BULK ADD</code>
-                <span class="cmd-desc"
-                  >Upload all tenants at once via CSV file in WhatsApp</span
-                >
-              </div>
+            <div class="cat-title">
+              Daily use — these are the only three you need every month
             </div>
-
-            <div class="command-group-label">Agent commands</div>
-            <div class="command-list">
-              <div class="cmd-row">
-                <code class="cmd-code">CLIENTS</code>
-                <span class="cmd-desc"
-                  >List all managed landlords with unit counts and status</span
-                >
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">LIST</span>
+                <div>
+                  <div class="cmd-desc">
+                    See all units — who has paid, who hasn't, and any partial
+                    balances — for the current month
+                  </div>
+                </div>
               </div>
-              <div class="cmd-row">
-                <code class="cmd-code">LIST Wanjiku</code>
-                <span class="cmd-desc"
-                  >Paid vs unpaid for a specific landlord in your
-                  portfolio</span
-                >
+              <div class="cmd-card">
+                <span class="cmd-code">REMIND</span>
+                <div>
+                  <div class="cmd-desc">
+                    Send a WhatsApp reminder to every tenant who hasn't paid
+                    this month. One word, done.
+                  </div>
+                </div>
               </div>
-              <div class="cmd-row">
-                <code class="cmd-code">TOTAL ALL</code>
-                <span class="cmd-desc"
-                  >Combined collected vs expected across all landlords</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">REMIND Wanjiku</code>
-                <span class="cmd-desc"
-                  >Send reminders for one landlord's unpaid tenants</span
-                >
-              </div>
-              <div class="cmd-row">
-                <code class="cmd-code">RECEIPT Wanjiku 4B</code>
-                <span class="cmd-desc"
-                  >Resend a receipt for a unit under a specific landlord</span
-                >
+              <div class="cmd-card">
+                <span class="cmd-code">TOTAL</span>
+                <div>
+                  <div class="cmd-desc">
+                    Total collected vs total expected this month, with the
+                    outstanding balance
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- live demo panel -->
-          <div class="command-demo-panel">
-            <div class="demo-panel-header">
-              <div class="demo-dot" style="background: #ff5f57"></div>
-              <div class="demo-dot" style="background: #ffbd2e"></div>
-              <div class="demo-dot" style="background: #28c840"></div>
-              <span class="demo-panel-title"
-                >WhatsApp — RentLoop · live response</span
-              >
+          <div>
+            <div class="cat-title">Payment lookup</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">RECEIPT 4B</span>
+                <div>
+                  <div class="cmd-desc">
+                    Resend the payment receipt for a specific unit this month
+                  </div>
+                  <span class="cmd-ex">RECEIPT A1</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">HISTORY 4B</span>
+                <div>
+                  <div class="cmd-desc">
+                    Last 3 months of payment records for any unit — amounts and
+                    statuses
+                  </div>
+                  <span class="cmd-ex">HISTORY B1</span>
+                </div>
+              </div>
             </div>
-            <div class="demo-panel-body">
-              <div class="demo-line">
-                <span class="demo-prompt">You</span>
-                <span class="demo-text hi">LIST</span>
+          </div>
+
+          <div>
+            <div class="cat-title">Unit management</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">ADD UNIT</span>
+                <div>
+                  <div class="cmd-desc">
+                    Add a new unit with tenant name, phone number, and monthly
+                    rent
+                  </div>
+                  <span class="cmd-ex"
+                    >ADD UNIT 4B John Kamau 0712345678 12500</span
+                  >
+                </div>
               </div>
-              <div class="demo-divider"></div>
-              <div class="demo-line">
-                <span class="demo-prompt">RL</span>
-                <span class="demo-text">
-                  <span class="hi">RentLoop — April 2026</span><br />
-                  Paid: <span class="amt">3/5 units · KES 35,000</span
-                  ><br /><br />
-                  <span class="hi">✓ Unit 4B</span> — John Kamau<br />
-                  <span class="hi">✓ Unit 2A</span> — Mary Wanjiku<br />
-                  <span class="hi">✓ Unit 1C</span> — Samuel Ochieng<br /><br />
-                  <span style="color: #ef4444">✗ Unit 3A</span> — Grace Auma<br />
-                  <span style="color: #ef4444">✗ Unit 5B</span> — Peter
-                  Otieno<br /><br />
-                  <span class="dim">Reply REMIND to nudge unpaid.</span>
-                </span>
+              <div class="cmd-card">
+                <span class="cmd-code">REPLACE</span>
+                <div>
+                  <div class="cmd-desc">
+                    Swap the tenant on a unit. All previous payment history is
+                    preserved under the unit.
+                  </div>
+                  <span class="cmd-ex"
+                    >REPLACE 4B Grace Auma 0745678901 12500</span
+                  >
+                </div>
               </div>
-              <div class="demo-divider"></div>
-              <div class="demo-line">
-                <span class="demo-prompt">You</span>
-                <span class="demo-text hi">REMIND</span>
+              <div class="cmd-card">
+                <span class="cmd-code">SET RENT</span>
+                <div>
+                  <div class="cmd-desc">
+                    Update the expected monthly rent for a unit. Takes effect
+                    immediately for new payments.
+                  </div>
+                  <span class="cmd-ex">SET RENT 4B 14000</span>
+                </div>
               </div>
-              <div class="demo-divider"></div>
-              <div class="demo-line">
-                <span class="demo-prompt">RL</span>
-                <span class="demo-text">
-                  Sent reminders to <span class="amt">2 tenant(s).</span>
-                </span>
+              <div class="cmd-card">
+                <span class="cmd-code">BULK ADD</span>
+                <div>
+                  <div class="cmd-desc">
+                    Get the CSV template to upload all your tenants at once. Up
+                    to 50 units in one file.
+                  </div>
+                </div>
               </div>
-              <div class="demo-divider"></div>
-              <div class="demo-line">
-                <span class="demo-prompt">You</span>
-                <span class="demo-text hi">TOTAL</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">Payment handling</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">MARK … PAID</span>
+                <div>
+                  <div class="cmd-desc">
+                    Log a cash or bank payment manually. Recorded in the same
+                    ledger as M-Pesa payments.
+                  </div>
+                  <span class="cmd-ex">MARK 4B PAID 12500 CASH</span>
+                </div>
               </div>
-              <div class="demo-divider"></div>
-              <div class="demo-line">
-                <span class="demo-prompt">RL</span>
-                <span class="demo-text">
-                  Collected: <span class="amt">KES 35,000</span><br />
-                  Expected: <span class="dim">KES 57,500</span><br />
-                  Balance: <span style="color: #ef4444">KES 22,500</span>
-                </span>
+              <div class="cmd-card">
+                <span class="cmd-code">CLAIM … TO</span>
+                <div>
+                  <div class="cmd-desc">
+                    Assign an unmatched payment to the correct unit when a
+                    tenant used the wrong reference
+                  </div>
+                  <span class="cmd-ex">CLAIM LHG31AA5TX TO 4B</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">
+              Agent commands — manage multiple landlords from one WhatsApp
+              number
+            </div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">CLIENTS</span>
+                <div>
+                  <div class="cmd-desc">
+                    List all landlords in your portfolio with unit counts and
+                    subscription status
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">LIST Wanjiku</span>
+                <div>
+                  <div class="cmd-desc">
+                    Paid vs unpaid summary for a specific landlord you manage.
+                    Use any part of their name.
+                  </div>
+                  <span class="cmd-ex">LIST Kariuki</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">REMIND Wanjiku</span>
+                <div>
+                  <div class="cmd-desc">
+                    Send payment reminders to all unpaid tenants under a
+                    specific landlord
+                  </div>
+                  <span class="cmd-ex">REMIND Kariuki</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">TOTAL ALL</span>
+                <div>
+                  <div class="cmd-desc">
+                    Combined collected vs expected across your entire portfolio
+                    of landlords this month
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">TOTAL Wanjiku</span>
+                <div>
+                  <div class="cmd-desc">
+                    Collected vs expected for one specific landlord this month
+                  </div>
+                  <span class="cmd-ex">TOTAL Kariuki</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">RECEIPT Wanjiku 4B</span>
+                <div>
+                  <div class="cmd-desc">
+                    Get the payment receipt for a specific unit under a specific
+                    landlord
+                  </div>
+                  <span class="cmd-ex">RECEIPT Kariuki A1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">Getting started</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">JOIN</span>
+                <div>
+                  <div class="cmd-desc">
+                    Register as a new landlord and get your CSV onboarding
+                    template
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">HELP</span>
+                <div>
+                  <div class="cmd-desc">
+                    Get the full command list sent back to your WhatsApp any
+                    time
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <div class="cmd-note">
+          <strong>How commands work:</strong> All commands are typed in
+          CAPITALS. Unit references match exactly what your tenant types when
+          paying via M-Pesa if their unit is <strong>4B</strong>, they pay
+          account <strong>4B</strong> and you type <strong>RECEIPT 4B</strong>.
+          Variations like <em>4b</em>, <em>unit 4B</em>, and
+          <em>UNIT-4B</em> all resolve to the same unit automatically. For agent
+          commands, you can use any part of the landlord's name —
+          <strong>LIST Wanjiku</strong> will find
+          <em>Sarah Wanjiku Properties</em>.
+        </div>
       </div>
     </section>
 
-    <!-- PRICING -->
-    <section id="pricing" class="pricing-section section-wrap">
-      <div class="pricing-inner">
-        <div class="section-center">
-          <p class="eyebrow">
-            <span class="eyebrow-line"></span>Pricing<span
-              class="eyebrow-line"
-            ></span>
-          </p>
-          <h2 class="section-heading">Start free. Pay when you grow.</h2>
-          <p class="section-sub section-sub-center">
-            No contracts. No hidden fees. Cancel anytime by simply stopping
-            payment.
+    <!-- Pricing -->
+    <section id="pricing">
+      <div class="pricing-section fade-up">
+        <div class="pricing-header">
+          <span class="section-label">Pricing</span>
+          <h2 class="section-title">Simple and fair</h2>
+          <p class="section-sub">
+            Start free. Pay only when you grow past 10 units. No contracts, no
+            setup fees.
           </p>
         </div>
         <div class="pricing-grid">
           <div class="price-card">
-            <p class="price-tier">Msingi</p>
-            <p class="price-num">Free</p>
-            <p class="price-period">Up to 10 units · forever</p>
-            <p class="price-desc">
-              Perfect for small landlords getting started.
-            </p>
+            <div class="price-tier">Manual</div>
+            <div class="price-amt">Free</div>
+            <div class="price-sub">Up to 10 units · Forever</div>
+            <div class="price-div"></div>
             <ul class="price-features">
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--green)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Real-time M-Pesa payment notifications
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--green)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                All WhatsApp bot commands
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--green)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Tenant SMS receipts
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--green)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                6 PM daily digest
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--green)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Full payment history
-              </li>
+              <li>Real-time WhatsApp notifications</li>
+              <li>Tenant SMS receipts</li>
+              <li>All WhatsApp bot commands</li>
+              <li>6 PM daily digest</li>
+              <li>Payment history and receipts</li>
             </ul>
           </div>
           <div class="price-card featured">
-            <p class="price-tier">Mjengo</p>
-            <p class="price-num">
-              KES 50 <span class="price-period">/unit/mo</span>
-            </p>
-            <p class="price-period">11+ units</p>
-            <p class="price-desc">For serious landlords and property agents.</p>
+            <div class="feat-badge">Most popular</div>
+            <div class="price-tier">Automated</div>
+            <div class="price-amt">KES 50 <span>/unit/mo</span></div>
+            <div class="price-sub">11+ units · No cap</div>
+            <div class="price-div"></div>
             <ul class="price-features">
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Everything in Msingi
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Unlimited units
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Agent portfolio management
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Bulk CSV tenant upload
-              </li>
-              <li class="price-feature">
-                <svg
-                  class="check"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.9)"
-                  stroke-width="2.5"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                KES 40/unit above 100 units
-              </li>
+              <li>Everything in Automated</li>
+              <li>Unlimited units</li>
+              <li>Agent portfolio view</li>
+              <li>Multi-landlord management</li>
+              <li>Bulk CSV tenant onboarding</li>
             </ul>
           </div>
         </div>
-        <p class="price-note">
-          20 units = KES 1,000/month — less than the cost of one hour of manual
-          reconciliation.
+        <p class="pricing-note">
+          <strong>20 units = KES 1,000/month</strong> less than the cost of one
+          hour of manual reconciliation.<br />
+          Agent managing 60 units across 3 landlords = KES 3,000/month and ~30
+          hours saved every month.
         </p>
       </div>
     </section>
 
     <!-- CTA -->
     <section class="cta-section">
-      <h2 class="cta-h2">Ready for a better 1st of the month?</h2>
-      <p class="cta-p">
-        Send JOIN on WhatsApp. Setup takes 30 minutes. Free to start.
-      </p>
-      <a
-        href="https://wa.me/254700000000?text=JOIN"
-        target="_blank"
-        class="btn-wa"
-      >
-        <svg class="wa-icon" viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"
-          />
-          <path
-            d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.029 18.88a9.895 9.895 0 01-4.741-1.21l-.339-.202-3.522.923.942-3.427-.221-.351A9.86 9.86 0 012.12 9.95C2.12 4.488 6.568.04 12.03.04c2.638 0 5.116 1.028 6.98 2.893a9.828 9.828 0 012.893 6.98c-.003 5.46-4.453 9.908-9.874 9.968z"
-          />
-        </svg>
-        Send JOIN on WhatsApp
-      </a>
+      <div class="cta-inner">
+        <h2>Ready for a better 1st?</h2>
+        <p>
+          Send JOIN on WhatsApp. Takes 30 seconds. Free to start. No app needed.
+        </p>
+        <a
+          href="https://wa.me/254700000000?text=JOIN"
+          target="_blank"
+          class="btn-white"
+          >Send JOIN on WhatsApp →</a
+        >
+      </div>
     </section>
 
-    <!-- FOOTER -->
+    <!-- Footer -->
     <footer>
       <span class="footer-brand">RentLoop</span>
-      <span class="footer-copy">Built in Kenya, for Kenya · © {{.Year}}</span>
-      <a href="/admin/login" class="footer-link">Admin →</a>
+      <span class="footer-text">Built in Kenya, for Kenya · © {{.Year}}</span>
+      <div class="footer-links">
+        <a href="#how">How it works</a>
+        <a href="#commands">Commands</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/admin/login">Admin</a>
+      </div>
     </footer>
+
+    <script>
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((el) => {
+            if (el.isIntersecting) {
+              el.target.classList.add("visible");
+              io.unobserve(el.target);
+            }
+          });
+        },
+        { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+      );
+
+      document.querySelectorAll(".fade-up").forEach((el) => io.observe(el));
+
+      document.querySelectorAll(".step-card").forEach((card, i) => {
+        card.style.transitionDelay = `${i * 0.08}s`;
+        card.classList.add("fade-up");
+        io.observe(card);
+      });
+    </script>
   </body>
 </html>
