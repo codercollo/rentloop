@@ -27,13 +27,13 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func (r *Repository) GetLandlordByPhone(ctx context.Context, phone string) (*models.Landlord, error) {
 	var l models.Landlord
 	err := r.db.QueryRow(ctx, `
-		SELECT id, whatsapp_phone, name, paybill_number,
-		       subscription_status, billing_cycle_end, unit_count, created_at
-		FROM   landlords
-		WHERE  whatsapp_phone = $1
-		LIMIT  1
-	`, phone).Scan(
-		&l.ID, &l.WhatsAppPhone, &l.Name, &l.PaybillNumber,
+    SELECT id, whatsapp_phone, name, apartment_name, paybill_number,
+           subscription_status, billing_cycle_end, unit_count, created_at
+    FROM   landlords
+    WHERE  whatsapp_phone = $1
+    LIMIT  1
+`, phone).Scan(
+		&l.ID, &l.WhatsAppPhone, &l.Name, &l.ApartmentName, &l.PaybillNumber,
 		&l.SubscriptionStatus, &l.BillingCycleEnd, &l.UnitCount, &l.CreatedAt,
 	)
 	if err != nil {
@@ -114,12 +114,12 @@ func (r *Repository) GetUnitsWithStatus(ctx context.Context, landlordID, monthKe
 // GetLandlordsByAgent returns all landlords managed by an agent.
 func (r *Repository) GetLandlordsByAgent(ctx context.Context, agentID string) ([]models.Landlord, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, whatsapp_phone, name, paybill_number,
-		       subscription_status, billing_cycle_end, unit_count, created_at
-		FROM   landlords
-		WHERE  agent_id = $1
-		ORDER  BY name
-	`, agentID)
+    SELECT id, whatsapp_phone, name, apartment_name, paybill_number,
+           subscription_status, billing_cycle_end, unit_count, created_at
+    FROM   landlords
+    WHERE  agent_id = $1
+    ORDER  BY name
+`, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("get landlords by agent: %w", err)
 	}
@@ -129,7 +129,7 @@ func (r *Repository) GetLandlordsByAgent(ctx context.Context, agentID string) ([
 	for rows.Next() {
 		var l models.Landlord
 		if err := rows.Scan(
-			&l.ID, &l.WhatsAppPhone, &l.Name, &l.PaybillNumber,
+			&l.ID, &l.WhatsAppPhone, &l.Name, &l.ApartmentName, &l.PaybillNumber,
 			&l.SubscriptionStatus, &l.BillingCycleEnd, &l.UnitCount, &l.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan landlord: %w", err)
@@ -307,19 +307,23 @@ func (r *Repository) InsertUnit(ctx context.Context, u models.Unit) (*models.Uni
 func (r *Repository) CreateLandlord(ctx context.Context, l models.Landlord) (*models.Landlord, error) {
 	var created models.Landlord
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO landlords (whatsapp_phone, name, paybill_number, subscription_status)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (whatsapp_phone) DO UPDATE SET name = EXCLUDED.name
-		RETURNING id, whatsapp_phone, name, paybill_number,
-		          subscription_status, billing_cycle_end, unit_count, created_at
-	`,
+    INSERT INTO landlords (whatsapp_phone, name, apartment_name, paybill_number, subscription_status)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (whatsapp_phone) DO UPDATE 
+        SET name = EXCLUDED.name,
+            apartment_name = EXCLUDED.apartment_name
+    RETURNING id, whatsapp_phone, name, apartment_name, paybill_number,
+              subscription_status, billing_cycle_end, unit_count, created_at
+`,
 		l.WhatsAppPhone,
 		l.Name,
+		l.ApartmentName,
 		l.PaybillNumber,
 		string(l.SubscriptionStatus),
 	).Scan(
-		&created.ID, &created.WhatsAppPhone, &created.Name, &created.PaybillNumber,
-		&created.SubscriptionStatus, &created.BillingCycleEnd, &created.UnitCount, &created.CreatedAt,
+		&created.ID, &created.WhatsAppPhone, &created.Name, &created.ApartmentName,
+		&created.PaybillNumber, &created.SubscriptionStatus, &created.BillingCycleEnd,
+		&created.UnitCount, &created.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create landlord: %w", err)
@@ -344,19 +348,19 @@ func (r *Repository) UpdateUnitCount(ctx context.Context, landlordID string, del
 // Used by the 6 PM digest cron job.
 func (r *Repository) GetLandlordsWithUnpaid(ctx context.Context, monthKey string) ([]models.Landlord, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT DISTINCT l.id, l.whatsapp_phone, l.name, l.paybill_number,
-		       l.subscription_status, l.billing_cycle_end, l.unit_count, l.created_at
-		FROM   landlords l
-		JOIN   units u ON u.landlord_id = l.id AND u.active = TRUE
-		WHERE  l.subscription_status IN ('active','grace')
-		  AND  NOT EXISTS (
-			SELECT 1 FROM payments p
-			WHERE p.unit_id   = u.id
-			  AND p.month_key = $1
-			  AND p.status   != 'unmatched'
-			  AND p.amount   >= u.expected_rent
-		  )
-	`, monthKey)
+    SELECT DISTINCT l.id, l.whatsapp_phone, l.name, l.apartment_name, l.paybill_number,
+           l.subscription_status, l.billing_cycle_end, l.unit_count, l.created_at
+    FROM   landlords l
+    JOIN   units u ON u.landlord_id = l.id AND u.active = TRUE
+    WHERE  l.subscription_status IN ('active','grace')
+      AND  NOT EXISTS (
+        SELECT 1 FROM payments p
+        WHERE p.unit_id   = u.id
+          AND p.month_key = $1
+          AND p.status   != 'unmatched'
+          AND p.amount   >= u.expected_rent
+      )
+`, monthKey)
 	if err != nil {
 		return nil, fmt.Errorf("get landlords with unpaid: %w", err)
 	}
@@ -366,7 +370,7 @@ func (r *Repository) GetLandlordsWithUnpaid(ctx context.Context, monthKey string
 	for rows.Next() {
 		var l models.Landlord
 		if err := rows.Scan(
-			&l.ID, &l.WhatsAppPhone, &l.Name, &l.PaybillNumber,
+			&l.ID, &l.WhatsAppPhone, &l.Name, &l.ApartmentName, &l.PaybillNumber,
 			&l.SubscriptionStatus, &l.BillingCycleEnd, &l.UnitCount, &l.CreatedAt,
 		); err != nil {
 			return nil, err

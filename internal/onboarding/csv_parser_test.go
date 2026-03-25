@@ -1,4 +1,9 @@
 // Package onboarding_test contains black-box tests for the CSV parser.
+//
+// The tests validate CSV ingestion behavior including:
+// parsing valid rows, handling headers, skipping blank rows,
+// normalizing phone numbers and unit references, and collecting
+// validation errors for malformed or incomplete data.
 package onboarding_test
 
 import (

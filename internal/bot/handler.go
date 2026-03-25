@@ -1,3 +1,7 @@
+// Package bot implements the inbound WhatsApp webhook handler and message
+// processing logic. It supports providers like Twilio and Africa's Talking,
+// normalizes incoming messages, and delegates business logic to the service
+// layer while responding immediately to webhook requests.
 package bot
 
 import (

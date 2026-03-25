@@ -1,3 +1,6 @@
+// Package mpesa_test contains unit and integration tests for the M-Pesa C2B
+// callback handler, covering validation, payment processing, ledger recording,
+// notification dispatch, and error handling scenarios.
 package mpesa_test
 
 import (
@@ -46,12 +49,12 @@ type mockNotifier struct {
 	tenantCalled   bool
 }
 
-func (m *mockNotifier) NotifyLandlord(_ context.Context, _ string, _ *models.Payment, _ *models.Unit) error {
+func (m *mockNotifier) NotifyLandlord(_ context.Context, _ string, _ *models.Payment, _ *models.Unit, _ string) error {
 	m.landlordCalled = true
 	return nil
 }
 
-func (m *mockNotifier) NotifyTenant(_ context.Context, _ string, _ *models.Payment, _ *models.Unit) error {
+func (m *mockNotifier) NotifyTenant(_ context.Context, _ string, _ *models.Payment, _ *models.Unit, _ string) error {
 	m.tenantCalled = true
 	return nil
 }

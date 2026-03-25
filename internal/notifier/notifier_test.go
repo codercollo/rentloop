@@ -1,3 +1,7 @@
+// Package notifier_test contains unit tests for Twilio messaging via the notifier package.
+//
+// The tests mock Twilio’s API using httptest servers to validate request payloads,
+// message formatting, and error handling without making real network calls.
 package notifier_test
 
 import (
@@ -37,7 +41,7 @@ func TestTwilio_NotifyLandlord_SendsWhatsApp(t *testing.T) {
 	}
 	unit := &models.Unit{UnitRef: "4B", TenantName: "John Kamau"}
 
-	err := tw.NotifyLandlord(context.Background(), "+254781423339", p, unit)
+	err := tw.NotifyLandlord(context.Background(), "+254781423339", p, unit, "Sunrise Apartments")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +73,7 @@ func TestTwilio_NotifyTenant_SendsSMS(t *testing.T) {
 	}
 	unit := &models.Unit{UnitRef: "B01", TenantName: "Test Tenant"}
 
-	err := tw.NotifyTenant(context.Background(), "254741775492", p, unit)
+	err := tw.NotifyTenant(context.Background(), "254741775492", p, unit, "Sunrise Apartments")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

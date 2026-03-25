@@ -1,4 +1,6 @@
-// Package onboarding handles landlord registration and bulk tenant upload.
+// Package onboarding handles CSV parsing, validation, normalization,
+// and conversion of uploaded tenant data into internal models for
+// landlord onboarding and bulk unit creation.
 package onboarding
 
 import (

@@ -1,3 +1,8 @@
+// Package bot implements command parsing and execution logic for landlord
+// WhatsApp interactions. It processes inbound text commands, routes them to
+// the appropriate handlers (e.g., LIST, REMIND, TOTAL, ADD UNIT), and
+// interacts with repositories, notification services, and payment systems
+// to manage units, tenants, and rent payments.
 package bot
 
 import (
@@ -10,6 +15,14 @@ import (
 
 	"github.com/codercollo/rentloop/internal/models"
 )
+
+// apartmentLabel returns the apartment name when set, otherwise "RentLoop".
+func apartmentLabel(l *models.Landlord) string {
+	if l.ApartmentName != "" {
+		return l.ApartmentName
+	}
+	return "RentLoop"
+}
 
 // handleLandlord parses and executes a landlord command.
 func (s *Service) handleLandlord(ctx context.Context, upper string, l *models.Landlord) string {
@@ -103,7 +116,7 @@ func (s *Service) cmdList(ctx context.Context, l *models.Landlord) string {
 
 	month := time.Now().Format("January 2006")
 	sb := &strings.Builder{}
-	fmt.Fprintf(sb, "*RentLoop — %s*\n", month)
+	fmt.Fprintf(sb, "*%s — %s*\n", apartmentLabel(l), month)
 	fmt.Fprintf(sb, "Paid: %d/%d units · KES %d\n\n", len(paid), len(units), totalPaid)
 	if len(paid) > 0 {
 		sb.WriteString(strings.Join(paid, "\n"))
@@ -165,8 +178,8 @@ func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 
 	month := time.Now().Format("January 2006")
 	return fmt.Sprintf(
-		"*RentLoop — %s*\nCollected: KES %d\nExpected:  KES %d\nBalance:   KES %d",
-		month, collected, expected, expected-collected,
+		"*%s — %s*\nCollected: KES %d\nExpected:  KES %d\nBalance:   KES %d",
+		apartmentLabel(l), month, collected, expected, expected-collected,
 	)
 }
 
@@ -249,8 +262,8 @@ func (s *Service) cmdAddUnit(ctx context.Context, l *models.Landlord, parts []st
 	}
 
 	return fmt.Sprintf(
-		"Unit %s added.\nTenant: %s\nPhone: %s\nRent: KES %d\n\nPaybill: %s · Account: *%s*",
-		inserted.UnitRef, inserted.TenantName, inserted.TenantPhone,
+		"Unit %s added to *%s*.\nTenant: %s\nPhone: %s\nRent: KES %d\n\nPaybill: %s · Account: *%s*",
+		inserted.UnitRef, l.ApartmentName, inserted.TenantName, inserted.TenantPhone,
 		inserted.ExpectedRent, l.PaybillNumber, inserted.UnitRef,
 	)
 }

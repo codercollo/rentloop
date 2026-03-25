@@ -147,13 +147,13 @@ func (r *Repository) GetUnitByRef(ctx context.Context, landlordID, normalisedRef
 func (r *Repository) GetByPaybill(ctx context.Context, paybill string) (*models.Landlord, error) {
 	var l models.Landlord
 	err := r.db.QueryRow(ctx, `
-		SELECT id, whatsapp_phone, name, paybill_number,
-		       subscription_status, billing_cycle_end, unit_count, created_at
-		FROM   landlords
-		WHERE  paybill_number = $1
-		LIMIT  1
-	`, paybill).Scan(
-		&l.ID, &l.WhatsAppPhone, &l.Name, &l.PaybillNumber,
+    SELECT id, whatsapp_phone, name, apartment_name, paybill_number,
+           subscription_status, billing_cycle_end, unit_count, created_at
+    FROM   landlords
+    WHERE  paybill_number = $1
+    LIMIT  1
+`, paybill).Scan(
+		&l.ID, &l.WhatsAppPhone, &l.Name, &l.ApartmentName, &l.PaybillNumber,
 		&l.SubscriptionStatus, &l.BillingCycleEnd, &l.UnitCount, &l.CreatedAt,
 	)
 	if err != nil {

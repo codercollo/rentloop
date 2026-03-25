@@ -1,5 +1,6 @@
-// Package notifier handles all outbound WhatsApp and SMS messages
-// via the Africa's Talking API.
+// Package notifier sends outbound WhatsApp and SMS messages via external APIs,
+// including Africa’s Talking. It provides helpers to send raw messages and
+// structured notifications such as landlord payment alerts.
 package notifier
 
 import (
@@ -47,12 +48,11 @@ func NewWhatsAppWithURL(url, apiKey, username, from string) *WhatsApp {
 }
 
 // NotifyLandlord sends a payment notification to the landlord's WhatsApp.
-// When unit is nil the payment was unmatched — the message reflects that.
-func (w *WhatsApp) NotifyLandlord(ctx context.Context, landlordPhone string, p *models.Payment, unit *models.Unit) error {
+func (w *WhatsApp) NotifyLandlord(ctx context.Context, landlordPhone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
 	if p == nil {
 		return fmt.Errorf("whatsapp: payment is nil")
 	}
-	return w.send(ctx, landlordPhone, buildLandlordMessage(p, unit))
+	return w.send(ctx, landlordPhone, buildLandlordMessage(p, unit, apartmentName))
 }
 
 // SendRaw sends a plain text message to any WhatsApp number.
@@ -97,24 +97,31 @@ func (w *WhatsApp) send(ctx context.Context, to, message string) error {
 
 // ── Message builders ──────────────────────────────────────────────────────────
 
-func buildLandlordMessage(p *models.Payment, unit *models.Unit) string {
+func buildLandlordMessage(p *models.Payment, unit *models.Unit, apartmentName string) string {
+	property := "RentLoop"
+	if apartmentName != "" {
+		property = apartmentName
+	}
+
 	if unit == nil {
 		return fmt.Sprintf(
-			"*RentLoop* — Unmatched payment\n"+
+			"*%s* — Unmatched payment\n"+
 				"Amount: KES %d\n"+
 				"From: %s\n"+
 				"Transaction: %s\n\n"+
 				"Reply *CLAIM %s TO <unit>* to assign it.",
+			property,
 			p.Amount, p.TenantPhone, p.TransactionID, p.TransactionID,
 		)
 	}
 
 	msg := fmt.Sprintf(
-		"*RentLoop* %s\n"+
+		"*%s* %s\n"+
 			"%s (Unit %s) paid KES %d\n"+
 			"Status: %s\n"+
 			"Time: %s\n"+
 			"Receipt: #%s",
+		property,
 		statusEmoji(p.Status),
 		unit.TenantName, unit.UnitRef, p.Amount,
 		formatStatus(p.Status),

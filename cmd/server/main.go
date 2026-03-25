@@ -234,12 +234,12 @@ func main() {
 // This adapter only handles rent payment notifications.
 type paymentNotifier struct{ tw *notifier.Twilio }
 
-func (n *paymentNotifier) NotifyLandlord(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
-	return n.tw.NotifyLandlord(ctx, phone, p, unit)
+func (n *paymentNotifier) NotifyLandlord(ctx context.Context, phone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
+	return n.tw.NotifyLandlord(ctx, phone, p, unit, apartmentName)
 }
 
-func (n *paymentNotifier) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
-	return n.tw.NotifyTenant(ctx, phone, p, unit)
+func (n *paymentNotifier) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
+	return n.tw.NotifyTenant(ctx, phone, p, unit, apartmentName)
 }
 
 // waSender adapts Twilio to bot.Sender — bot replies via WhatsApp.
