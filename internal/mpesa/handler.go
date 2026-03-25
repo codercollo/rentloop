@@ -25,8 +25,8 @@ type LedgerService interface {
 
 // NotifierService sends outbound messages.
 type NotifierService interface {
-	NotifyLandlord(ctx context.Context, landlordPhone string, payment *models.Payment, unit *models.Unit) error
-	NotifyTenant(ctx context.Context, phone string, payment *models.Payment, unit *models.Unit) error
+	NotifyLandlord(ctx context.Context, landlordPhone string, payment *models.Payment, unit *models.Unit, apartmentName string) error
+	NotifyTenant(ctx context.Context, phone string, payment *models.Payment, unit *models.Unit, apartmentName string) error
 }
 
 // LandlordRepository fetches landlord rows by paybill number.
@@ -175,10 +175,10 @@ func (h *Handler) process(cb C2BCallback) {
 	)
 
 	// ── Notify landlord + tenant ──────────────────────────────────────────────
-	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, unit); err != nil {
+	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, unit, landlord.ApartmentName); err != nil {
 		log.Error("process: landlord notification failed", "error", err)
 	}
-	if err := h.notifier.NotifyTenant(ctx, cb.MSISDN, recorded, unit); err != nil {
+	if err := h.notifier.NotifyTenant(ctx, cb.MSISDN, recorded, unit, landlord.ApartmentName); err != nil {
 		log.Error("process: tenant receipt failed", "error", err)
 	}
 }
@@ -212,7 +212,7 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 
 	log.Warn("handleUnmatched: recorded", "payment_id", recorded.ID)
 
-	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, nil); err != nil {
+	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, nil, landlord.ApartmentName); err != nil {
 		log.Error("handleUnmatched: notify failed", "error", err)
 	}
 }

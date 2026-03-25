@@ -52,12 +52,12 @@ func NewTwilioWithURL(baseURL, accountSID, authToken, whatsappFrom, smsFrom stri
 // ── WhatsApp ─────────────────────────────────────────────────────────────────
 
 // NotifyLandlord sends a payment notification to the landlord via WhatsApp.
-func (t *Twilio) NotifyLandlord(ctx context.Context, landlordPhone string, p *models.Payment, unit *models.Unit) error {
+func (t *Twilio) NotifyLandlord(ctx context.Context, landlordPhone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
 	if p == nil {
 		return fmt.Errorf("twilio: payment is nil")
 	}
 	to := "whatsapp:" + landlordPhone
-	return t.sendWhatsApp(ctx, to, buildLandlordMessage(p, unit))
+	return t.sendWhatsApp(ctx, to, buildLandlordMessage(p, unit, apartmentName))
 }
 
 // SendRaw sends a plain WhatsApp message — used by the bot sender adapter.
@@ -75,7 +75,7 @@ func (t *Twilio) sendWhatsApp(ctx context.Context, to, body string) error {
 
 // ── SMS ───────────────────────────────────────────────────────────────────────
 
-func (t *Twilio) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
+func (t *Twilio) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
 	if phone == "" {
 		return fmt.Errorf("twilio: tenant phone is empty")
 	}
@@ -87,7 +87,7 @@ func (t *Twilio) NotifyTenant(ctx context.Context, phone string, p *models.Payme
 	// Sandbox: both channels use WhatsApp
 	// Production: switch this to t.sendSMS once you have a real SMS number
 	to := "whatsapp:" + phone
-	return t.sendWhatsApp(ctx, to, buildTenantSMS(p, unit))
+	return t.sendWhatsApp(ctx, to, buildTenantSMS(p, unit, apartmentName))
 }
 
 // NotifyLandlordSMS sends a plain SMS notification to the landlord.
@@ -122,13 +122,24 @@ func (t *Twilio) SendReminder(ctx context.Context, phone, tenantName, unitRef st
 }
 
 // SendOnboarding sends payment instructions to a new tenant via SMS.
-func (t *Twilio) SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill string, expectedRent int) error {
-	msg := fmt.Sprintf(
-		"Hi %s, your landlord uses RentLoop. "+
-			"Pay KES %d monthly to Paybill %s, account: %s. "+
-			"You will receive a receipt instantly after payment.",
-		tenantName, expectedRent, paybill, unitRef,
-	)
+func (t *Twilio) SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill, apartmentName string, expectedRent int) error {
+	var msg string
+	if apartmentName != "" {
+		msg = fmt.Sprintf(
+			"Hi %s, your landlord at %s uses RentLoop for rent. "+
+				"Pay KES %d monthly to Paybill %s, account: %s. "+
+				"You will receive a receipt instantly after payment.",
+			tenantName, apartmentName, expectedRent, paybill, unitRef,
+		)
+	} else {
+		msg = fmt.Sprintf(
+			"Hi %s, your landlord uses RentLoop for rent. "+
+				"Pay KES %d monthly to Paybill %s, account: %s. "+
+				"You will receive a receipt instantly after payment.",
+			tenantName, expectedRent, paybill, unitRef,
+		)
+	}
+	// normalise phone to E.164
 	if !strings.HasPrefix(phone, "+") {
 		phone = "+" + phone
 	}

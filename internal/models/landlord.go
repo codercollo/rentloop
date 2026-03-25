@@ -12,6 +12,7 @@ type Landlord struct {
 	ID                 string             `db:"id"`
 	WhatsAppPhone      string             `db:"whatsapp_phone"`
 	Name               string             `db:"name"`
+	ApartmentName      string             `db:"apartment_name"`
 	PaybillNumber      string             `db:"paybill_number"`
 	SubscriptionStatus SubscriptionStatus `db:"subscription_status"`
 	BillingCycleEnd    *time.Time         `db:"billing_cycle_end"`

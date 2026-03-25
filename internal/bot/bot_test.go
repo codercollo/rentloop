@@ -114,10 +114,26 @@ func (m *mockSender) Send(_ context.Context, to, msg string) error {
 	return nil
 }
 
-type mockSMS struct{ reminders int }
+type mockSMS struct {
+	reminders  int
+	onboarding int
+}
 
 func (m *mockSMS) SendReminder(_ context.Context, _, _, _ string, _ int, _ string) error {
 	m.reminders++
+	return nil
+}
+
+func (m *mockSMS) SendOnboarding(
+	_ context.Context,
+	_ string,
+	_ string,
+	_ string,
+	_ string,
+	_ string,
+	_ int,
+) error {
+	m.onboarding++
 	return nil
 }
 

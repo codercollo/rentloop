@@ -1,4 +1,6 @@
-// Package notifier — SMS outbound via Africa's Talking.
+// Package notifier provides SMS messaging via Africa’s Talking,
+// including tenant notifications, landlord alerts, reminders,
+// onboarding messages, and raw SMS sending utilities.
 package notifier
 
 import (
@@ -34,11 +36,12 @@ func NewSMS(apiKey, username, senderID string) *SMS {
 }
 
 // NotifyTenant sends an SMS receipt to the tenant after a matched payment.
-func (s *SMS) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
+// apartmentName is passed from the landlord record.
+func (s *SMS) NotifyTenant(ctx context.Context, phone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
 	if phone == "" {
 		return fmt.Errorf("sms: tenant phone is empty")
 	}
-	return s.send(ctx, phone, buildTenantSMS(p, unit))
+	return s.send(ctx, phone, buildTenantSMS(p, unit, apartmentName))
 }
 
 // NotifyLandlordSMS sends an SMS notification to the landlord.
@@ -70,13 +73,23 @@ func (s *SMS) SendReminder(ctx context.Context, phone, tenantName, unitRef strin
 }
 
 // SendOnboarding sends one-time payment instructions to a new tenant.
-func (s *SMS) SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill string, expectedRent int) error {
-	msg := fmt.Sprintf(
-		"Hi %s, your landlord uses RentLoop for rent. "+
-			"Pay KES %d monthly to Paybill %s, account: %s. "+
-			"You will receive a receipt instantly after payment.",
-		tenantName, expectedRent, paybill, unitRef,
-	)
+func (s *SMS) SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill, apartmentName string, expectedRent int) error {
+	var msg string
+	if apartmentName != "" {
+		msg = fmt.Sprintf(
+			"Hi %s, your landlord at %s uses RentLoop for rent. "+
+				"Pay KES %d monthly to Paybill %s, account: %s. "+
+				"You will receive a receipt instantly after payment.",
+			tenantName, apartmentName, expectedRent, paybill, unitRef,
+		)
+	} else {
+		msg = fmt.Sprintf(
+			"Hi %s, your landlord uses RentLoop for rent. "+
+				"Pay KES %d monthly to Paybill %s, account: %s. "+
+				"You will receive a receipt instantly after payment.",
+			tenantName, expectedRent, paybill, unitRef,
+		)
+	}
 	return s.send(ctx, phone, msg)
 }
 
@@ -88,10 +101,16 @@ func (s *SMS) SendRaw(ctx context.Context, to, message string) error {
 }
 
 // buildTenantSMS formats the SMS receipt for the tenant.
-func buildTenantSMS(p *models.Payment, unit *models.Unit) string {
+func buildTenantSMS(p *models.Payment, unit *models.Unit, apartmentName string) string {
+	property := "RentLoop"
+	if apartmentName != "" {
+		property = apartmentName
+	}
+
 	if unit == nil {
 		return fmt.Sprintf(
-			"RentLoop: KES %d received on %s. Ref: %s.",
+			"%s: KES %d received on %s. Ref: %s.",
+			property,
 			p.Amount,
 			p.PaidAt.Format("02 Jan 2006 15:04"),
 			p.TransactionID,
@@ -103,20 +122,20 @@ func buildTenantSMS(p *models.Payment, unit *models.Unit) string {
 	switch p.Status {
 	case models.PaymentStatusPaid, models.PaymentStatusOver:
 		return fmt.Sprintf(
-			"RentLoop: KES %d received for Unit %s on %s. "+
+			"%s: KES %d received for Unit %s on %s. "+
 				"Rent paid in full. Receipt: #%s.",
-			p.Amount, unit.UnitRef, ts, shortID(p.ID),
+			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	case models.PaymentStatusPartial:
 		return fmt.Sprintf(
-			"RentLoop: KES %d received for Unit %s on %s. "+
+			"%s: KES %d received for Unit %s on %s. "+
 				"Partial payment recorded. Receipt: #%s.",
-			p.Amount, unit.UnitRef, ts, shortID(p.ID),
+			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	default:
 		return fmt.Sprintf(
-			"RentLoop: KES %d received. Ref: %s.",
-			p.Amount, p.TransactionID,
+			"%s: KES %d received. Ref: %s.",
+			property, p.Amount, p.TransactionID,
 		)
 	}
 }

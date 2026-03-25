@@ -38,7 +38,7 @@ func TestNotifyLandlord_FullPayment_MessageContainsNameAndAmount(t *testing.T) {
 	}
 	unit := &models.Unit{UnitRef: "4B", TenantName: "John Kamau"}
 
-	if err := wa.NotifyLandlord(context.Background(), "+254712345678", p, unit); err != nil {
+	if err := wa.NotifyLandlord(context.Background(), "+254712345678", p, unit, "Sunrise Apartments"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotBody, "John Kamau") {
@@ -68,7 +68,7 @@ func TestNotifyLandlord_PartialPayment_MessageContainsPartialText(t *testing.T) 
 	}
 	unit := &models.Unit{UnitRef: "2A", TenantName: "Mary Wanjiku"}
 
-	if err := wa.NotifyLandlord(context.Background(), "+254712345678", p, unit); err != nil {
+	if err := wa.NotifyLandlord(context.Background(), "+254712345678", p, unit, "Sunrise Apartments"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotBody, "Partial") {
@@ -90,7 +90,7 @@ func TestNotifyLandlord_UnmatchedPayment_MessageContainsClaim(t *testing.T) {
 		Amount: 8000, TenantPhone: "254712000001",
 	}
 
-	if err := wa.NotifyLandlord(context.Background(), "+254712345678", p, nil); err != nil {
+	if err := wa.NotifyLandlord(context.Background(), "+254712345678", p, nil, "Sunrise Apartments"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotBody, "CLAIM") {

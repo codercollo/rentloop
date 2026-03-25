@@ -118,9 +118,9 @@ func (s *Service) agentCmdList(ctx context.Context, a *models.Agent, name string
 
 	month := time.Now().Format("January 2006")
 	return fmt.Sprintf(
-		"*%s — %s*\nPaid: %d/%d units · KES %d collected\n\n"+
+		"*%s (%s) — %s*\nPaid: %d/%d units · KES %d collected\n\n"+
 			"Reply *LIST %s* for full breakdown.",
-		landlord.Name, month,
+		landlord.ApartmentName, landlord.Name, month,
 		paidCount, len(units), collected, landlord.Name,
 	)
 }
@@ -215,8 +215,8 @@ func (s *Service) agentCmdTotal(ctx context.Context, a *models.Agent, name strin
 
 	month := time.Now().Format("January 2006")
 	return fmt.Sprintf(
-		"*%s — %s*\nCollected: KES %d\nExpected:  KES %d\nBalance:   KES %d",
-		landlord.Name, month, collected, expected, expected-collected,
+		"*%s (%s) — %s*\nCollected: KES %d\nExpected:  KES %d\nBalance:   KES %d",
+		landlord.ApartmentName, landlord.Name, month, collected, expected, expected-collected,
 	)
 }
 

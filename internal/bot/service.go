@@ -19,9 +19,11 @@ type Sender interface {
 	Send(ctx context.Context, to, message string) error
 }
 
-// SMSNotifier sends reminder SMS to tenants.
+// SMSNotifier sends onboarding SMS to tenants.
+// SMSNotifier sends reminder and onboarding SMS to tenants.
 type SMSNotifier interface {
 	SendReminder(ctx context.Context, phone, tenantName, unitRef string, expectedRent int, month string) error
+	SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill, apartmentName string, expectedRent int) error
 }
 
 // BotRepository is the persistence interface the service depends on.
@@ -64,6 +66,12 @@ func (s *Service) SetOnboarding(svc *onboarding.Service) {
 // Handle is the main dispatch entry point called by the HTTP handler.
 func (s *Service) Handle(ctx context.Context, from, text string) {
 	upper := strings.ToUpper(strings.TrimSpace(text))
+
+	// Mid-onboarding: landlord is supplying their apartment name
+	if s.onboarding != nil && s.onboarding.IsPendingApartmentName(from) {
+		s.onboarding.HandleApartmentName(ctx, from, text)
+		return
+	}
 
 	landlord, agent, err := s.identify(ctx, from)
 	if err != nil {
