@@ -81,7 +81,7 @@ test:
 
 # Run tests with race detector
 test-race:
-	go test ./... -race -count=1
+	CGO_ENABLED=1 go test ./... -race -count=1
 
 # Generate coverage report
 test-cover:

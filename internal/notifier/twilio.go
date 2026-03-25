@@ -116,7 +116,9 @@ func (t *Twilio) SendReminder(ctx context.Context, phone, tenantName, unitRef st
 	if !strings.HasPrefix(phone, "+") {
 		phone = "+" + phone
 	}
-	return t.sendSMS(ctx, phone, msg)
+	// TODO: switch to t.sendSMS in production
+	to := "whatsapp:" + phone
+	return t.sendWhatsApp(ctx, to, msg)
 }
 
 // SendOnboarding sends payment instructions to a new tenant via SMS.

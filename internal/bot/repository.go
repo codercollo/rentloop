@@ -224,6 +224,7 @@ func (r *Repository) GetUnitByRef(ctx context.Context, landlordID, ref string) (
 // GetUnmatchedPayment returns an unmatched payment by transaction ID.
 func (r *Repository) GetUnmatchedPayment(ctx context.Context, landlordID, transactionID string) (*models.Payment, error) {
 	var p models.Payment
+	var unitID *string // nullable
 	err := r.db.QueryRow(ctx, `
 		SELECT id, transaction_id, unit_id, landlord_id,
 		       tenant_phone, amount, status, month_key, receipt_url, paid_at
@@ -233,7 +234,7 @@ func (r *Repository) GetUnmatchedPayment(ctx context.Context, landlordID, transa
 		  AND  status         = 'unmatched'
 		LIMIT  1
 	`, landlordID, transactionID).Scan(
-		&p.ID, &p.TransactionID, &p.UnitID, &p.LandlordID,
+		&p.ID, &p.TransactionID, &unitID, &p.LandlordID,
 		&p.TenantPhone, &p.Amount, &p.Status, &p.MonthKey, &p.ReceiptURL, &p.PaidAt,
 	)
 	if err != nil {
@@ -241,6 +242,9 @@ func (r *Repository) GetUnmatchedPayment(ctx context.Context, landlordID, transa
 			return nil, models.ErrNotFound
 		}
 		return nil, fmt.Errorf("get unmatched payment: %w", err)
+	}
+	if unitID != nil {
+		p.UnitID = *unitID
 	}
 	return &p, nil
 }
@@ -387,35 +391,31 @@ func (r *Repository) UpdateExpectedRent(ctx context.Context, landlordID, unitRef
 }
 
 func (r *Repository) ReplaceUnitTenant(ctx context.Context, landlordID string, u models.Unit) (*models.Unit, error) {
-	tx, err := r.db.Begin(ctx)
+	var updated models.Unit
+	err := r.db.QueryRow(ctx, `
+		UPDATE units SET
+			tenant_name   = $3,
+			tenant_phone  = $4,
+			expected_rent = $5,
+			effective_from = NOW()
+		WHERE  landlord_id = $1
+		  AND  unit_ref    = $2
+		  AND  active      = TRUE
+		RETURNING id, landlord_id, unit_ref, tenant_name, tenant_phone,
+		          expected_rent, active, effective_from, created_at
+	`, landlordID, u.UnitRef, u.TenantName, u.TenantPhone, u.ExpectedRent,
+	).Scan(
+		&updated.ID, &updated.LandlordID, &updated.UnitRef, &updated.TenantName,
+		&updated.TenantPhone, &updated.ExpectedRent, &updated.Active,
+		&updated.EffectiveFrom, &updated.CreatedAt,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, models.ErrNotFound
+		}
+		return nil, fmt.Errorf("replace unit tenant: %w", err)
 	}
-	_, err = tx.Exec(ctx,
-		`UPDATE units SET active = FALSE WHERE landlord_id = $1 AND unit_ref = $2 AND active = TRUE`,
-		landlordID, u.UnitRef)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return nil, fmt.Errorf("deactivate unit: %w", err)
-	}
-	var inserted models.Unit
-	err = tx.QueryRow(ctx, `
-        INSERT INTO units (landlord_id, unit_ref, tenant_name, tenant_phone, expected_rent)
-        VALUES ($1,$2,$3,$4,$5)
-        RETURNING id, landlord_id, unit_ref, tenant_name, tenant_phone,
-                  expected_rent, active, effective_from, created_at
-    `, landlordID, u.UnitRef, u.TenantName, u.TenantPhone, u.ExpectedRent,
-	).Scan(&inserted.ID, &inserted.LandlordID, &inserted.UnitRef, &inserted.TenantName,
-		&inserted.TenantPhone, &inserted.ExpectedRent, &inserted.Active,
-		&inserted.EffectiveFrom, &inserted.CreatedAt)
-	if err != nil {
-		_ = tx.Rollback(ctx)
-		return nil, fmt.Errorf("insert replacement: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
-	}
-	return &inserted, nil
+	return &updated, nil
 }
 
 func (r *Repository) InsertManualPayment(ctx context.Context, p models.Payment) (*models.Payment, error) {

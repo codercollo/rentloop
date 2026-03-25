@@ -1,357 +1,1452 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RentLoop — Automated Rent Collection for Kenya</title>
-  <link rel="stylesheet" href="/static/css/admin.css">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1a1a1a; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RentLoop — Automated Rent Collection for Kenya</title>
 
-    /* ── Colours ── */
-    :root {
-      --green:       #00a550;
-      --green-light: #e8f7ef;
-      --green-mid:   #b8e6cc;
-      --green-dark:  #007a3d;
-      --text:        #1a1a1a;
-      --muted:       #6b7280;
-      --border:      #e5e7eb;
-      --surface:     #f9fafb;
-    }
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-    /* ── Nav ── */
-    nav {
-      position: fixed; top: 0; width: 100%; z-index: 50;
-      background: rgba(255,255,255,0.95); backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 1.5rem; height: 64px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .nav-logo { font-size: 1.25rem; font-weight: 700; color: var(--green); letter-spacing: -0.02em; }
-    .nav-links { display: flex; align-items: center; gap: 2rem; }
-    .nav-links a { font-size: 0.9rem; color: var(--muted); text-decoration: none; }
-    .nav-links a:hover { color: var(--text); }
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.6rem 1.25rem; background: var(--green); color: #fff;
-      border-radius: 8px; font-size: 0.9rem; font-weight: 600;
-      text-decoration: none; transition: background 0.15s;
-    }
-    .btn-primary:hover { background: var(--green-dark); }
-    .btn-outline {
-      display: inline-flex; align-items: center;
-      padding: 0.6rem 1.25rem; border: 1.5px solid var(--border);
-      color: var(--text); border-radius: 8px; font-size: 0.9rem;
-      font-weight: 500; text-decoration: none; transition: border-color 0.15s;
-    }
-    .btn-outline:hover { border-color: var(--green); color: var(--green); }
+      :root {
+        --green: #00a550;
+        --green-light: #e6f7ee;
+        --green-mid: #a8dfc0;
+        --green-dark: #007a3d;
+        --green-xdark: #005a2d;
+        --text: #0f1a12;
+        --muted: #5a6b5f;
+        --muted-light: #9aac9f;
+        --border: #e0e8e3;
+        --surface: #f5faf7;
+        --white: #ffffff;
+      }
 
-    /* ── Hero ── */
-    .hero {
-      padding: 120px 1.5rem 80px;
-      max-width: 680px; margin: 0 auto; text-align: center;
-    }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.3rem 0.9rem; background: var(--green-light);
-      border-radius: 999px; font-size: 0.8rem; color: var(--green-dark);
-      font-weight: 500; margin-bottom: 1.5rem;
-    }
-    .hero-badge span { width: 7px; height: 7px; background: var(--green); border-radius: 50%; display: inline-block; }
-    .hero h1 {
-      font-size: clamp(2.2rem, 5vw, 3.5rem);
-      font-weight: 700; line-height: 1.15;
-      letter-spacing: -0.03em; margin-bottom: 1.25rem; color: var(--text);
-    }
-    .hero h1 em { font-style: normal; color: var(--green); }
-    .hero p { font-size: 1.1rem; color: var(--muted); line-height: 1.7; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto; }
-    .hero-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
-    .hero-note { font-size: 0.8rem; color: #9ca3af; margin-top: 1rem; }
+      html {
+        scroll-behavior: smooth;
+      }
 
-    /* ── Section headings ── */
-    .section-label {
-      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--green); margin-bottom: 0.75rem;
-    }
-    .section-title { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.75rem; }
-    .section-sub { color: var(--muted); font-size: 1rem; line-height: 1.6; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--white);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
 
-    /* ── Demo strip ── */
-    .demo-section { background: var(--surface); padding: 4rem 1.5rem; }
-    .demo-inner { max-width: 520px; margin: 0 auto; }
-    .demo-label { text-align: center; font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
-    .chat-bubble-wrap { display: flex; flex-direction: column; gap: 0.75rem; }
-    .bubble-row { display: flex; align-items: flex-end; gap: 0.6rem; }
-    .bubble-row.right { flex-direction: row-reverse; }
-    .avatar {
-      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.65rem; font-weight: 700;
-    }
-    .avatar.rl { background: var(--green); color: #fff; }
-    .avatar.you { background: #e5e7eb; color: var(--text); }
-    .bubble {
-      padding: 0.75rem 1rem; border-radius: 14px; max-width: 340px; font-size: 0.875rem; line-height: 1.5;
-    }
-    .bubble.incoming {
-      background: #fff; border: 1px solid var(--border);
-      border-bottom-left-radius: 4px;
-    }
-    .bubble.outgoing {
-      background: var(--green-light); border: 1px solid var(--green-mid);
-      border-bottom-right-radius: 4px; color: var(--green-dark);
-    }
-    .bubble .paid { color: var(--green); font-weight: 600; }
-    .bubble .amount { font-weight: 700; color: var(--text); }
-    .bubble .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
-    .bubble .action { color: var(--green); font-weight: 500; margin-top: 0.3rem; }
+      /* ─── Nav ─── */
+      nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 100;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border-bottom: 1px solid var(--border);
+        padding: 0 2rem;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nav-logo {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: var(--green);
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .nav-logo-dot {
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse-dot 2s ease infinite;
+      }
+      @keyframes pulse-dot {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.55;
+          transform: scale(0.8);
+        }
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+      }
+      .nav-links a {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      .nav-links a:hover {
+        color: var(--text);
+      }
+      .btn-nav {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.55rem 1.2rem;
+        background: var(--green);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .btn-nav:hover {
+        background: var(--green-dark);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(0, 165, 80, 0.25);
+      }
 
-    /* ── How it works ── */
-    .how-section { padding: 5rem 1.5rem; max-width: 900px; margin: 0 auto; }
-    .how-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-top: 2.5rem; }
-    .step-card {
-      background: #fff; border: 1px solid var(--border); border-radius: 12px;
-      padding: 1.5rem; transition: box-shadow 0.2s;
-    }
-    .step-card:hover { box-shadow: 0 4px 20px rgba(0,165,80,0.08); border-color: var(--green-mid); }
-    .step-number {
-      width: 36px; height: 36px; background: var(--green-light); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: var(--green); font-size: 0.9rem; margin-bottom: 1rem;
-    }
-    .step-card h3 { font-weight: 600; font-size: 1rem; margin-bottom: 0.4rem; }
-    .step-card p { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+      /* ─── Hero ─── */
+      .hero {
+        padding: 128px 2rem 72px;
+        max-width: 700px;
+        margin: 0 auto;
+        text-align: center;
+        position: relative;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 400px;
+        background: radial-gradient(
+          ellipse at center,
+          rgba(0, 165, 80, 0.07) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 1rem;
+        background: var(--green-light);
+        border: 1px solid var(--green-mid);
+        border-radius: 999px;
+        font-size: 0.78rem;
+        color: var(--green-dark);
+        font-weight: 600;
+        margin-bottom: 1.75rem;
+        letter-spacing: 0.02em;
+      }
+      .badge-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--green);
+        border-radius: 50%;
+        animation: pulse-dot 2s ease infinite;
+      }
+      .hero h1 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(2.4rem, 5.5vw, 3.75rem);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
+        margin-bottom: 1.25rem;
+        color: var(--text);
+      }
+      .hero h1 em {
+        font-style: normal;
+        color: var(--green);
+      }
+      .hero p {
+        font-size: 1.1rem;
+        color: var(--muted);
+        line-height: 1.75;
+        margin-bottom: 2.25rem;
+        max-width: 480px;
+        margin-left: auto;
+        margin-right: auto;
+        font-weight: 300;
+      }
+      .hero-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      .btn-hero {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.9rem 1.85rem;
+        background: var(--green);
+        color: #fff;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        box-shadow:
+          0 2px 0 var(--green-dark),
+          0 8px 24px rgba(0, 165, 80, 0.2);
+      }
+      .btn-hero:hover {
+        background: var(--green-dark);
+        transform: translateY(-2px);
+        box-shadow:
+          0 4px 0 var(--green-xdark),
+          0 12px 32px rgba(0, 165, 80, 0.3);
+      }
+      .btn-hero-ghost {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.9rem 1.85rem;
+        border: 1.5px solid var(--border);
+        color: var(--text);
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .btn-hero-ghost:hover {
+        border-color: var(--green);
+        color: var(--green);
+        background: var(--green-light);
+      }
+      .hero-note {
+        font-size: 0.8rem;
+        color: var(--muted-light);
+      }
 
-    /* ── Commands ── */
-    .commands-section { background: var(--surface); padding: 4rem 1.5rem; }
-    .commands-inner { max-width: 680px; margin: 0 auto; }
-    .commands-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 2rem; }
-    @media (max-width: 500px) { .commands-grid { grid-template-columns: 1fr; } }
-    .command-row {
-      display: flex; align-items: flex-start; gap: 0.75rem;
-      background: #fff; border: 1px solid var(--border); border-radius: 8px;
-      padding: 0.75rem 1rem;
-    }
-    .command-row code { color: var(--green); font-size: 0.8rem; font-weight: 700; flex-shrink: 0; font-family: monospace; }
-    .command-row span { font-size: 0.8rem; color: var(--muted); }
+      /* ─── Stats ─── */
+      .stats-bar {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 1.25rem 2rem;
+      }
+      .stats-inner {
+        max-width: 680px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-around;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .stat {
+        text-align: center;
+      }
+      .stat-number {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--green);
+        letter-spacing: -0.03em;
+      }
+      .stat-label {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin-top: 0.1rem;
+      }
 
-    /* ── Pricing ── */
-    .pricing-section { padding: 5rem 1.5rem; max-width: 720px; margin: 0 auto; }
-    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 2.5rem; }
-    @media (max-width: 540px) { .pricing-grid { grid-template-columns: 1fr; } }
-    .price-card {
-      border: 1.5px solid var(--border); border-radius: 14px; padding: 2rem;
-    }
-    .price-card.featured { border-color: var(--green); background: var(--green-light); }
-    .price-tier { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--green); margin-bottom: 0.5rem; }
-    .price-amount { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.25rem; }
-    .price-amount span { font-size: 1rem; font-weight: 400; color: var(--muted); }
-    .price-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.25rem; }
-    .price-features { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
-    .price-features li { display: flex; gap: 0.5rem; font-size: 0.875rem; color: var(--text); }
-    .price-features li::before { content: "✓"; color: var(--green); font-weight: 700; flex-shrink: 0; }
-    .pricing-note { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 1.5rem; }
+      /* ─── Demo ─── */
+      .demo-section {
+        background: var(--surface);
+        padding: 5rem 2rem;
+        position: relative;
+        overflow: hidden;
+      }
+      .demo-section::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            circle at 15% 50%,
+            rgba(0, 165, 80, 0.04) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 85% 50%,
+            rgba(0, 165, 80, 0.04) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
+      }
+      .demo-inner {
+        max-width: 420px;
+        margin: 0 auto;
+        position: relative;
+      }
+      .demo-header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      .demo-header h2 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.5rem;
+      }
+      .demo-header p {
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
 
-    /* ── CTA ── */
-    .cta-section {
-      background: var(--green); padding: 5rem 1.5rem; text-align: center;
-    }
-    .cta-section h2 { font-size: 1.75rem; font-weight: 700; color: #fff; margin-bottom: 0.75rem; }
-    .cta-section p { color: rgba(255,255,255,0.8); margin-bottom: 2rem; }
-    .btn-white {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.85rem 2rem; background: #fff; color: var(--green);
-      border-radius: 8px; font-weight: 700; text-decoration: none;
-      font-size: 1rem; transition: opacity 0.15s;
-    }
-    .btn-white:hover { opacity: 0.92; }
+      .phone-shell {
+        background: #1c1c1e;
+        border-radius: 40px;
+        padding: 10px;
+        box-shadow:
+          0 40px 100px rgba(0, 0, 0, 0.22),
+          0 0 0 1px rgba(255, 255, 255, 0.06);
+      }
+      .phone-screen {
+        background: #fff;
+        border-radius: 32px;
+        overflow: hidden;
+      }
+      .phone-status {
+        background: #075e54;
+        padding: 0.65rem 1rem 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+      .phone-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .phone-contact-name {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #fff;
+      }
+      .phone-contact-status {
+        font-size: 0.68rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin-top: 1px;
+      }
+      .phone-icons {
+        margin-left: auto;
+        display: flex;
+        gap: 0.8rem;
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 1.05rem;
+      }
 
-    /* ── Footer ── */
-    footer {
-      padding: 2rem 1.5rem; text-align: center;
-      border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem;
-    }
-    footer a { color: var(--muted); text-decoration: none; margin-top: 0.5rem; display: inline-block; }
-    footer a:hover { color: var(--text); }
-  </style>
-</head>
-<body>
+      .chat-bg {
+        background-color: #ece5dd;
+        background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23c4b9ae' fill-opacity='0.18'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+        padding: 1rem 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        min-height: 370px;
+      }
+      .msg-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.4rem;
+      }
+      .msg-row.out {
+        flex-direction: row-reverse;
+      }
+      .msg-av {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #25d366;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.52rem;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .msg {
+        max-width: 80%;
+        padding: 0.6rem 0.85rem;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        line-height: 1.55;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+      .msg.in {
+        background: #fff;
+        border-top-left-radius: 2px;
+      }
+      .msg.out {
+        background: #d9fdd3;
+        border-top-right-radius: 2px;
+      }
+      .msg b {
+        color: #075e54;
+      }
+      .msg .amt {
+        font-weight: 700;
+        color: var(--text);
+      }
+      .msg .t {
+        font-size: 0.62rem;
+        color: #aaa;
+        display: block;
+        text-align: right;
+        margin-top: 3px;
+      }
+      .msg .hint {
+        color: #25d366;
+        font-weight: 600;
+        font-size: 0.73rem;
+        display: block;
+        margin-top: 0.25rem;
+      }
+      .typing {
+        display: flex;
+        gap: 3px;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: #fff;
+        border-radius: 10px;
+        width: fit-content;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+      .td {
+        width: 6px;
+        height: 6px;
+        background: #aaa;
+        border-radius: 50%;
+        animation: td 1.2s ease infinite;
+      }
+      .td:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .td:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes td {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
+        }
+        30% {
+          transform: translateY(-4px);
+          opacity: 1;
+        }
+      }
 
-<!-- Nav -->
-<nav>
-  <span class="nav-logo">RentLoop</span>
-  <div class="nav-links">
-    <a href="#how">How it works</a>
-    <a href="#pricing">Pricing</a>
-    <a href="https://wa.me/254741775492?text=JOIN" target="_blank" class="btn-primary">
-      Get started free
-    </a>
-  </div>
-</nav>
+      /* ─── How it works ─── */
+      .how-section {
+        padding: 6rem 2rem;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .section-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin-bottom: 0.6rem;
+        display: block;
+      }
+      .section-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(1.6rem, 3vw, 2.1rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.75rem;
+        line-height: 1.2;
+      }
+      .section-sub {
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.7;
+        font-weight: 300;
+      }
 
-<!-- Hero -->
-<section class="hero">
-  <div class="hero-badge">
-    <span></span>
-    Live in Kenya
-  </div>
-  <h1>Rent collection on<br><em>M-Pesa + WhatsApp.</em></h1>
-  <p>
-    The moment a tenant pays, you know. No statements. No spreadsheets.
-    No phone calls. Just one WhatsApp message.
-  </p>
-  <div class="hero-actions">
-    <a href="https://wa.me/254741775492?text=JOIN" target="_blank" class="btn-primary">
-      Start free on WhatsApp →
-    </a>
-    <a href="#how" class="btn-outline">See how it works</a>
-  </div>
-  <p class="hero-note">Free for up to 10 units. No app needed.</p>
-</section>
+      .how-steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+        margin-top: 2.75rem;
+        position: relative;
+      }
+      .how-steps::before {
+        content: "";
+        position: absolute;
+        top: 26px;
+        left: calc(16.67% + 18px);
+        right: calc(16.67% + 18px);
+        height: 1px;
+        background: var(--green-mid);
+        pointer-events: none;
+      }
+      .step-card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.5rem;
+        transition: all 0.2s;
+      }
+      .step-card:hover {
+        box-shadow: 0 8px 32px rgba(0, 165, 80, 0.1);
+        border-color: var(--green-mid);
+        transform: translateY(-2px);
+      }
+      .step-num {
+        width: 36px;
+        height: 36px;
+        background: var(--green);
+        color: #fff;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 800;
+        font-size: 0.9rem;
+        margin-bottom: 1.1rem;
+      }
+      .step-card h3 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+      }
+      .step-card p {
+        font-size: 0.845rem;
+        color: var(--muted);
+        line-height: 1.65;
+      }
 
-<!-- Demo chat -->
-<section class="demo-section">
-  <div class="demo-inner">
-    <p class="demo-label">What you see on the 1st of the month</p>
-    <div class="chat-bubble-wrap">
+      /* ─── Commands ─── */
+      .commands-section {
+        background: var(--text);
+        padding: 5.5rem 2rem;
+        position: relative;
+        overflow: hidden;
+      }
+      .commands-section::before {
+        content: "";
+        position: absolute;
+        top: -40%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 800px;
+        height: 800px;
+        background: radial-gradient(
+          circle,
+          rgba(0, 165, 80, 0.08) 0%,
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+      .commands-inner {
+        max-width: 900px;
+        margin: 0 auto;
+        position: relative;
+      }
+      .commands-header {
+        margin-bottom: 2.75rem;
+      }
+      .commands-header .section-label {
+        color: var(--green);
+      }
+      .commands-header .section-title {
+        color: #fff;
+      }
+      .commands-header .section-sub {
+        color: rgba(255, 255, 255, 0.45);
+      }
 
-      <div class="bubble-row">
-        <div class="avatar rl">RL</div>
-        <div class="bubble incoming">
-          <p class="paid">✓ RentLoop</p>
-          <p>John Kamau (Unit 4B) paid <span class="amount">KES 12,500</span></p>
-          <p class="meta">Paid in full · 01 Apr 08:02</p>
+      .cmd-categories {
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+      }
+      .cat-title {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.3);
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.6rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .cmd-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 0.5rem;
+      }
+      .cmd-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        padding: 0.9rem 1.1rem;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0 1rem;
+        align-items: start;
+        transition: all 0.15s;
+      }
+      .cmd-card:hover {
+        background: rgba(0, 165, 80, 0.08);
+        border-color: rgba(0, 165, 80, 0.25);
+      }
+      .cmd-code {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--green);
+        white-space: nowrap;
+        letter-spacing: 0.02em;
+        padding-top: 1px;
+      }
+      .cmd-desc {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.6);
+        line-height: 1.5;
+      }
+      .cmd-ex {
+        margin-top: 0.3rem;
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 0.71rem;
+        color: rgba(255, 255, 255, 0.28);
+        padding: 0.2rem 0.5rem;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 5px;
+        display: inline-block;
+      }
+      .cmd-note {
+        margin-top: 1.75rem;
+        padding: 1.1rem 1.35rem;
+        background: rgba(0, 165, 80, 0.08);
+        border: 1px solid rgba(0, 165, 80, 0.2);
+        border-radius: 10px;
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.65;
+      }
+      .cmd-note strong {
+        color: var(--green);
+      }
+
+      /* ─── Pricing ─── */
+      .pricing-section {
+        padding: 6rem 2rem;
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .pricing-header {
+        margin-bottom: 2.75rem;
+      }
+      .pricing-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+      }
+      @media (max-width: 540px) {
+        .pricing-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .price-card {
+        border: 1.5px solid var(--border);
+        border-radius: 16px;
+        padding: 2rem;
+        transition: all 0.2s;
+      }
+      .price-card:hover {
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+        transform: translateY(-2px);
+      }
+      .price-card.featured {
+        border-color: var(--green);
+        background: linear-gradient(135deg, var(--green-light) 0%, #fff 100%);
+        position: relative;
+      }
+      .feat-badge {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--green);
+        color: #fff;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 0.3rem 0.85rem;
+        border-radius: 999px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .price-tier {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--green);
+        margin-bottom: 0.75rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .price-amt {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        margin-bottom: 0.2rem;
+      }
+      .price-amt span {
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: var(--muted);
+        letter-spacing: 0;
+      }
+      .price-sub {
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+      }
+      .price-div {
+        height: 1px;
+        background: var(--border);
+        margin-bottom: 1.25rem;
+      }
+      .price-features {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      .price-features li {
+        display: flex;
+        gap: 0.6rem;
+        font-size: 0.845rem;
+        align-items: flex-start;
+      }
+      .price-features li::before {
+        content: "✓";
+        color: var(--green);
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+      }
+      .pricing-note {
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.82rem;
+        margin-top: 1.75rem;
+        line-height: 1.6;
+      }
+      .pricing-note strong {
+        color: var(--text);
+      }
+
+      /* ─── CTA ─── */
+      .cta-section {
+        background: var(--green);
+        padding: 5.5rem 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .cta-section::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(
+            circle at 20% 50%,
+            rgba(255, 255, 255, 0.06) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 50%,
+            rgba(255, 255, 255, 0.06) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
+      }
+      .cta-inner {
+        position: relative;
+        max-width: 520px;
+        margin: 0 auto;
+      }
+      .cta-section h2 {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: clamp(1.75rem, 4vw, 2.5rem);
+        font-weight: 800;
+        color: #fff;
+        margin-bottom: 0.75rem;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+      }
+      .cta-section p {
+        color: rgba(255, 255, 255, 0.75);
+        margin-bottom: 2.25rem;
+        font-size: 1rem;
+        line-height: 1.6;
+      }
+      .btn-white {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem 2.25rem;
+        background: #fff;
+        color: var(--green);
+        border-radius: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        font-size: 1rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        transition: all 0.15s;
+        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
+      }
+      .btn-white:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.1);
+      }
+
+      /* ─── Footer ─── */
+      footer {
+        padding: 1.75rem 2rem;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .footer-brand {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-weight: 800;
+        font-size: 1rem;
+        color: var(--green);
+      }
+      .footer-text {
+        font-size: 0.8rem;
+        color: var(--muted-light);
+      }
+      .footer-links {
+        display: flex;
+        gap: 1.5rem;
+      }
+      .footer-links a {
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      .footer-links a:hover {
+        color: var(--text);
+      }
+
+      /* ─── Responsive ─── */
+      @media (max-width: 680px) {
+        nav {
+          padding: 0 1.25rem;
+        }
+        .nav-links a:not(.btn-nav) {
+          display: none;
+        }
+        .hero {
+          padding: 100px 1.25rem 56px;
+        }
+        .how-steps {
+          grid-template-columns: 1fr;
+        }
+        .how-steps::before {
+          display: none;
+        }
+        .cmd-grid {
+          grid-template-columns: 1fr;
+        }
+        footer {
+          flex-direction: column;
+          text-align: center;
+        }
+        .footer-links {
+          justify-content: center;
+        }
+      }
+
+      /* ─── Scroll animations ─── */
+      .fade-up {
+        opacity: 0;
+        transform: translateY(20px);
+        transition:
+          opacity 0.5s ease,
+          transform 0.5s ease;
+      }
+      .fade-up.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Nav -->
+    <nav>
+      <span class="nav-logo">RentLoop</span>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#commands">Commands</a>
+        <a href="#pricing">Pricing</a>
+        <a
+          href="https://wa.me/254700000000?text=JOIN"
+          target="_blank"
+          class="btn-nav"
+          >Get started free →</a
+        >
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-badge">
+        <span class="badge-dot"></span>Now live in Kenya — Beta
+      </div>
+      <h1>Rent collection on<br /><em>M-Pesa + WhatsApp.</em></h1>
+      <p>
+        The moment a tenant pays, you know. No statements. No spreadsheets. No
+        calls. Just one WhatsApp message — automatically.
+      </p>
+      <div class="hero-actions">
+        <a
+          href="https://wa.me/254700000000?text=JOIN"
+          target="_blank"
+          class="btn-hero"
+          >Start free on WhatsApp →</a
+        >
+        <a href="#how" class="btn-hero-ghost">See how it works</a>
+      </div>
+      <p class="hero-note">
+        Free forever up to 10 units · No app · No spreadsheet
+      </p>
+    </section>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stats-inner">
+        <div class="stat">
+          <div class="stat-number">3s</div>
+          <div class="stat-label">Payment to notification</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">0</div>
+          <div class="stat-label">Apps to install</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">KES 50</div>
+          <div class="stat-label">Per unit per month</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">M-Pesa native</div>
         </div>
       </div>
+    </div>
 
-      <div class="bubble-row">
-        <div class="avatar rl">RL</div>
-        <div class="bubble incoming">
-          <p class="paid">✓ RentLoop</p>
-          <p>Mary Wanjiku (Unit 2A) paid <span class="amount">KES 8,000</span></p>
-          <p class="meta">Paid in full · 01 Apr 09:15</p>
+    <!-- Demo -->
+    <section class="demo-section">
+      <div class="demo-inner fade-up">
+        <div class="demo-header">
+          <span class="section-label">Live demo</span>
+          <h2>What the 1st looks like now</h2>
+          <p>Your WhatsApp on rent day — without lifting a finger</p>
+        </div>
+        <div class="phone-shell">
+          <div class="phone-screen">
+            <div class="phone-status">
+              <div class="phone-avatar">RL</div>
+              <div style="flex: 1">
+                <div class="phone-contact-name">RentLoop</div>
+                <div class="phone-contact-status">● online</div>
+              </div>
+              <div class="phone-icons">📞 ⋮</div>
+            </div>
+            <div class="chat-bg">
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  <b>✓ RentLoop</b><br />John Kamau (Unit 4B) paid
+                  <span class="amt">KES 12,500</span><br />Status: Paid in
+                  full<span class="t">08:02 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  <b>✓ RentLoop</b><br />Mary Wanjiku (Unit 2A) paid
+                  <span class="amt">KES 8,000</span><br />Status: Paid in
+                  full<span class="t">09:15 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  8 of 12 units paid · <span class="amt">KES 94,500</span
+                  ><br /><span style="color: #888; font-size: 0.72rem"
+                    >Unpaid: Peter Otieno 1C, Grace Auma 3A...</span
+                  ><span class="hint">Reply REMIND to nudge them →</span
+                  ><span class="t">18:00 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row out">
+                <div class="msg out">REMIND<span class="t">18:01 ✓✓</span></div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-av">RL</div>
+                <div class="msg in">
+                  Sent reminders to <b>4 unpaid tenants.</b
+                  ><span class="t">18:01 ✓✓</span>
+                </div>
+              </div>
+              <div class="msg-row">
+                <div style="width: 24px"></div>
+                <div class="typing">
+                  <div class="td"></div>
+                  <div class="td"></div>
+                  <div class="td"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="bubble-row">
-        <div class="avatar rl">RL</div>
-        <div class="bubble incoming">
-          <p>8 of 12 units paid · <span class="amount">KES 94,500</span> collected</p>
-          <p class="meta" style="margin-top:0.3rem">Unpaid: Peter Otieno 1C, Grace Auma 3A...</p>
-          <p class="action">Reply REMIND to nudge them.</p>
+    <!-- How it works -->
+    <section id="how">
+      <div class="how-section fade-up">
+        <div style="max-width: 480px">
+          <span class="section-label">How it works</span>
+          <h2 class="section-title">No app. No login.<br />Just WhatsApp.</h2>
+          <p class="section-sub">
+            Everything runs through the messaging app you already have open all
+            day.
+          </p>
+        </div>
+        <div class="how-steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <h3>Tenant pays M-Pesa</h3>
+            <p>
+              Tenant sends rent to your existing Paybill using their unit
+              reference (e.g. <strong>4B</strong>) as the account number.
+              Nothing changes for them.
+            </p>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <h3>Both get notified instantly</h3>
+            <p>
+              Within 3 seconds you receive a WhatsApp notification. The tenant
+              gets an SMS receipt. Automatic. Every payment.
+            </p>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <h3>Manage from WhatsApp</h3>
+            <p>
+              Type <strong>LIST</strong> to see who has paid. Type
+              <strong>REMIND</strong> to nudge everyone who hasn't. No login. No
+              URL.
+            </p>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="bubble-row right">
-        <div class="avatar you">You</div>
-        <div class="bubble outgoing">REMIND</div>
-      </div>
+    <!-- Commands -->
+    <section id="commands" class="commands-section">
+      <div class="commands-inner fade-up">
+        <div class="commands-header">
+          <span class="section-label">WhatsApp commands</span>
+          <h2 class="section-title">Everything from one message</h2>
+          <p class="section-sub">
+            Send any command in capitals to your RentLoop WhatsApp number. No
+            login. No URL. No app.
+          </p>
+        </div>
 
-      <div class="bubble-row">
-        <div class="avatar rl">RL</div>
-        <div class="bubble incoming">
-          <p>Sent reminders to <strong>4 unpaid tenants.</strong></p>
+        <div class="cmd-categories">
+          <div>
+            <div class="cat-title">
+              Daily use — these are the only three you need every month
+            </div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">LIST</span>
+                <div>
+                  <div class="cmd-desc">
+                    See all units — who has paid, who hasn't, and any partial
+                    balances — for the current month
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">REMIND</span>
+                <div>
+                  <div class="cmd-desc">
+                    Send a WhatsApp reminder to every tenant who hasn't paid
+                    this month. One word, done.
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">TOTAL</span>
+                <div>
+                  <div class="cmd-desc">
+                    Total collected vs total expected this month, with the
+                    outstanding balance
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">Payment lookup</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">RECEIPT 4B</span>
+                <div>
+                  <div class="cmd-desc">
+                    Resend the payment receipt for a specific unit this month
+                  </div>
+                  <span class="cmd-ex">RECEIPT A1</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">HISTORY 4B</span>
+                <div>
+                  <div class="cmd-desc">
+                    Last 3 months of payment records for any unit — amounts and
+                    statuses
+                  </div>
+                  <span class="cmd-ex">HISTORY B1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">Unit management</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">ADD UNIT</span>
+                <div>
+                  <div class="cmd-desc">
+                    Add a new unit with tenant name, phone number, and monthly
+                    rent
+                  </div>
+                  <span class="cmd-ex"
+                    >ADD UNIT 4B John Kamau 0712345678 12500</span
+                  >
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">REPLACE</span>
+                <div>
+                  <div class="cmd-desc">
+                    Swap the tenant on a unit. All previous payment history is
+                    preserved under the unit.
+                  </div>
+                  <span class="cmd-ex"
+                    >REPLACE 4B Grace Auma 0745678901 12500</span
+                  >
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">SET RENT</span>
+                <div>
+                  <div class="cmd-desc">
+                    Update the expected monthly rent for a unit. Takes effect
+                    immediately for new payments.
+                  </div>
+                  <span class="cmd-ex">SET RENT 4B 14000</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">BULK ADD</span>
+                <div>
+                  <div class="cmd-desc">
+                    Get the CSV template to upload all your tenants at once. Up
+                    to 50 units in one file.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">Payment handling</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">MARK … PAID</span>
+                <div>
+                  <div class="cmd-desc">
+                    Log a cash or bank payment manually. Recorded in the same
+                    ledger as M-Pesa payments.
+                  </div>
+                  <span class="cmd-ex">MARK 4B PAID 12500 CASH</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">CLAIM … TO</span>
+                <div>
+                  <div class="cmd-desc">
+                    Assign an unmatched payment to the correct unit when a
+                    tenant used the wrong reference
+                  </div>
+                  <span class="cmd-ex">CLAIM LHG31AA5TX TO 4B</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">
+              Agent commands — manage multiple landlords from one WhatsApp
+              number
+            </div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">CLIENTS</span>
+                <div>
+                  <div class="cmd-desc">
+                    List all landlords in your portfolio with unit counts and
+                    subscription status
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">LIST Wanjiku</span>
+                <div>
+                  <div class="cmd-desc">
+                    Paid vs unpaid summary for a specific landlord you manage.
+                    Use any part of their name.
+                  </div>
+                  <span class="cmd-ex">LIST Kariuki</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">REMIND Wanjiku</span>
+                <div>
+                  <div class="cmd-desc">
+                    Send payment reminders to all unpaid tenants under a
+                    specific landlord
+                  </div>
+                  <span class="cmd-ex">REMIND Kariuki</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">TOTAL ALL</span>
+                <div>
+                  <div class="cmd-desc">
+                    Combined collected vs expected across your entire portfolio
+                    of landlords this month
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">TOTAL Wanjiku</span>
+                <div>
+                  <div class="cmd-desc">
+                    Collected vs expected for one specific landlord this month
+                  </div>
+                  <span class="cmd-ex">TOTAL Kariuki</span>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">RECEIPT Wanjiku 4B</span>
+                <div>
+                  <div class="cmd-desc">
+                    Get the payment receipt for a specific unit under a specific
+                    landlord
+                  </div>
+                  <span class="cmd-ex">RECEIPT Kariuki A1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="cat-title">Getting started</div>
+            <div class="cmd-grid">
+              <div class="cmd-card">
+                <span class="cmd-code">JOIN</span>
+                <div>
+                  <div class="cmd-desc">
+                    Register as a new landlord and get your CSV onboarding
+                    template
+                  </div>
+                </div>
+              </div>
+              <div class="cmd-card">
+                <span class="cmd-code">HELP</span>
+                <div>
+                  <div class="cmd-desc">
+                    Get the full command list sent back to your WhatsApp any
+                    time
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cmd-note">
+          <strong>How commands work:</strong> All commands are typed in
+          CAPITALS. Unit references match exactly what your tenant types when
+          paying via M-Pesa if their unit is <strong>4B</strong>, they pay
+          account <strong>4B</strong> and you type <strong>RECEIPT 4B</strong>.
+          Variations like <em>4b</em>, <em>unit 4B</em>, and
+          <em>UNIT-4B</em> all resolve to the same unit automatically. For agent
+          commands, you can use any part of the landlord's name —
+          <strong>LIST Wanjiku</strong> will find
+          <em>Sarah Wanjiku Properties</em>.
         </div>
       </div>
+    </section>
 
-    </div>
-  </div>
-</section>
-
-<!-- How it works -->
-<section id="how">
-  <div class="how-section">
-    <div style="max-width:520px">
-      <p class="section-label">How it works</p>
-      <h2 class="section-title">No app. No spreadsheet. Just WhatsApp.</h2>
-      <p class="section-sub">Everything runs through the messaging app you already have open all day.</p>
-    </div>
-    <div class="how-steps">
-      <div class="step-card">
-        <div class="step-number">1</div>
-        <h3>Tenant pays M-Pesa</h3>
-        <p>Tenant sends rent to your Paybill number with their unit reference as the account.</p>
+    <!-- Pricing -->
+    <section id="pricing">
+      <div class="pricing-section fade-up">
+        <div class="pricing-header">
+          <span class="section-label">Pricing</span>
+          <h2 class="section-title">Simple and fair</h2>
+          <p class="section-sub">
+            Start free. Pay only when you grow past 10 units. No contracts, no
+            setup fees.
+          </p>
+        </div>
+        <div class="pricing-grid">
+          <div class="price-card">
+            <div class="price-tier">Manual</div>
+            <div class="price-amt">Free</div>
+            <div class="price-sub">Up to 10 units · Forever</div>
+            <div class="price-div"></div>
+            <ul class="price-features">
+              <li>Real-time WhatsApp notifications</li>
+              <li>Tenant SMS receipts</li>
+              <li>All WhatsApp bot commands</li>
+              <li>6 PM daily digest</li>
+              <li>Payment history and receipts</li>
+            </ul>
+          </div>
+          <div class="price-card featured">
+            <div class="feat-badge">Most popular</div>
+            <div class="price-tier">Automated</div>
+            <div class="price-amt">KES 50 <span>/unit/mo</span></div>
+            <div class="price-sub">11+ units · No cap</div>
+            <div class="price-div"></div>
+            <ul class="price-features">
+              <li>Everything in Automated</li>
+              <li>Unlimited units</li>
+              <li>Agent portfolio view</li>
+              <li>Multi-landlord management</li>
+              <li>Bulk CSV tenant onboarding</li>
+            </ul>
+          </div>
+        </div>
+        <p class="pricing-note">
+          <strong>20 units = KES 1,000/month</strong> less than the cost of one
+          hour of manual reconciliation.<br />
+          Agent managing 60 units across 3 landlords = KES 3,000/month and ~30
+          hours saved every month.
+        </p>
       </div>
-      <div class="step-card">
-        <div class="step-number">2</div>
-        <h3>You get notified instantly</h3>
-        <p>Within 3 seconds you receive a WhatsApp message. The tenant gets an SMS receipt.</p>
-      </div>
-      <div class="step-card">
-        <div class="step-number">3</div>
-        <h3>Manage from WhatsApp</h3>
-        <p>Type LIST, REMIND, or TOTAL to manage your entire portfolio. No login, no URL.</p>
-      </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- Commands -->
-<section class="commands-section">
-  <div class="commands-inner">
-    <p class="section-label" style="text-align:center">Commands</p>
-    <h2 class="section-title" style="text-align:center">Everything from one message</h2>
-    <div class="commands-grid">
-      {{range .Commands}}
-      <div class="command-row">
-        <code>{{.Cmd}}</code>
-        <span>{{.Desc}}</span>
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="cta-inner">
+        <h2>Ready for a better 1st?</h2>
+        <p>
+          Send JOIN on WhatsApp. Takes 30 seconds. Free to start. No app needed.
+        </p>
+        <a
+          href="https://wa.me/254700000000?text=JOIN"
+          target="_blank"
+          class="btn-white"
+          >Send JOIN on WhatsApp →</a
+        >
       </div>
-      {{end}}
-    </div>
-  </div>
-</section>
+    </section>
 
-<!-- Pricing -->
-<section id="pricing">
-  <div class="pricing-section">
-    <p class="section-label" style="text-align:center">Pricing</p>
-    <h2 class="section-title" style="text-align:center">Simple and fair</h2>
-    <p class="section-sub" style="text-align:center">Start free. Pay only when you grow past 10 units.</p>
-    <div class="pricing-grid">
-      <div class="price-card">
-        <p class="price-tier">Msingi</p>
-        <p class="price-amount">Free</p>
-        <p class="price-sub">Up to 10 units · Forever</p>
-        <ul class="price-features">
-          <li>Real-time payment notifications</li>
-          <li>WhatsApp bot commands</li>
-          <li>Tenant SMS receipts</li>
-          <li>6 PM daily digest</li>
-        </ul>
+    <!-- Footer -->
+    <footer>
+      <span class="footer-brand">RentLoop</span>
+      <span class="footer-text">Built in Kenya, for Kenya · © {{.Year}}</span>
+      <div class="footer-links">
+        <a href="#how">How it works</a>
+        <a href="#commands">Commands</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/admin/login">Admin</a>
       </div>
-      <div class="price-card featured">
-        <p class="price-tier">Mjengo</p>
-        <p class="price-amount">KES 50 <span>/unit/mo</span></p>
-        <p class="price-sub">11+ units</p>
-        <ul class="price-features">
-          <li>Everything in Msingi</li>
-          <li>Unlimited units</li>
-          <li>Agent portfolio view</li>
-          <li>Priority support</li>
-        </ul>
-      </div>
-    </div>
-    <p class="pricing-note">20 units = KES 1,000/month — less than one hour of manual work.</p>
-  </div>
-</section>
+    </footer>
 
-<!-- CTA -->
-<section class="cta-section">
-  <h2>Ready for a better 1st of the month?</h2>
-  <p>Send JOIN on WhatsApp. Takes 30 seconds. Free to start.</p>
-  <a href="https://wa.me/254741775492?text=JOIN" target="_blank" class="btn-white">
-    Send JOIN on WhatsApp →
-  </a>
-</section>
+    <script>
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((el) => {
+            if (el.isIntersecting) {
+              el.target.classList.add("visible");
+              io.unobserve(el.target);
+            }
+          });
+        },
+        { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+      );
 
-<!-- Footer -->
-<footer>
-  <p>RentLoop · Built in Kenya, for Kenya · © {{.Year}}</p>
-  <a href="/admin/login">Admin</a>
-</footer>
+      document.querySelectorAll(".fade-up").forEach((el) => io.observe(el));
 
-</body>
+      document.querySelectorAll(".step-card").forEach((card, i) => {
+        card.style.transitionDelay = `${i * 0.08}s`;
+        card.classList.add("fade-up");
+        io.observe(card);
+      });
+    </script>
+  </body>
 </html>

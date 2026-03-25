@@ -52,6 +52,8 @@ func main() {
 	tmpl := template.Must(template.ParseGlob("web/templates/*.html"))
 
 	// ── Repositories ──────────────────────────────────────────────────────────
+	// ledgerRepo satisfies ledger.PaymentRepository, matcher.Repository,
+	// and mpesa.LandlordRepository — one struct, three interfaces.
 	ledgerRepo := ledger.NewRepository(pool)
 	botRepo := bot.NewRepository(pool)
 
@@ -59,7 +61,7 @@ func main() {
 	ledgerSvc := ledger.NewService(ledgerRepo)
 	matcherSvc := matcher.New(ledgerRepo)
 
-	// ── Twilio ────────────────────────────────────────────────────────────────
+	// ── Twilio — WhatsApp + SMS ───────────────────────────────────────────────
 	tw := notifier.NewTwilio(
 		cfg.TwilioSID,
 		cfg.TwilioToken,
@@ -68,6 +70,8 @@ func main() {
 	)
 
 	// ── Bot ───────────────────────────────────────────────────────────────────
+	// waSender  → bot replies via Twilio WhatsApp
+	// smsSender → onboarding welcome messages via Twilio SMS
 	botSvc := bot.NewService(botRepo, &waSender{tw}, tw)
 	botHandler := bot.NewHandler(botSvc)
 	smsHandler := bot.NewSMSHandler(botSvc)
@@ -109,11 +113,15 @@ func main() {
 	defer c.Stop()
 
 	// ── M-Pesa ───────────────────────────────────────────────────────────────
+	// billingHandler is passed directly — RENTLOOP- refs are routed
+	// to billing inside mpesa.Handler, never touching the rent ledger.
+	// paymentNotifier only handles WhatsApp + SMS for rent payments.
 	mpesaHandler := mpesa.NewHandler(
 		matcherSvc,
 		ledgerSvc,
-		&paymentNotifier{tw, billingHandler},
+		&paymentNotifier{tw},
 		ledgerRepo,
+		billingHandler,
 		cfg.IsDevelopment(),
 	)
 
@@ -125,7 +133,7 @@ func main() {
 	r.Use(requestLogger)
 	r.Use(chimw.Timeout(30 * time.Second))
 
-	// ── Public routes ─────────────────────────────────────────────────────────
+	// ── Public ────────────────────────────────────────────────────────────────
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		tmpl.ExecuteTemplate(w, "landing.html", map[string]any{
 			"Year": time.Now().Year(),
@@ -147,7 +155,6 @@ func main() {
 		fmt.Fprint(w, `{"status":"ok"}`)
 	})
 
-	// Static files — compiled Tailwind CSS + any other assets
 	r.Handle("/static/*", http.StripPrefix("/static/",
 		http.FileServer(http.Dir("web/static"))))
 
@@ -162,7 +169,7 @@ func main() {
 	r.Get("/admin/activate", authHandler.Activate)
 	r.Post("/admin/logout", authHandler.Logout)
 
-	// One-time setup — env-gated, self-disables after first admin is created
+	// One-time setup — env-gated, self-disables after first admin exists
 	r.Get("/admin/setup", adminHandler.ShowSetup(cfg.AdminSetupSecret, authSvc))
 	r.Post("/admin/setup", adminHandler.DoSetup(cfg.AdminSetupSecret, authSvc))
 
@@ -177,7 +184,6 @@ func main() {
 		r.Get("/admin/payments", adminHandler.Payments)
 		r.Get("/admin/payments/unmatched", adminHandler.UnmatchedPayments)
 
-		// HTMX partial — dashboard payments feed
 		r.Get("/admin/payments/partial", func(w http.ResponseWriter, r *http.Request) {
 			payments, _ := adminRepo.GetRecentPayments(r.Context())
 			tmpl.ExecuteTemplate(w, "admin_payments_partial.html", payments)
@@ -223,13 +229,10 @@ func main() {
 
 // ── Adapters ─────────────────────────────────────────────────────────────────
 
-// paymentNotifier routes C2B callbacks:
-// RENTLOOP- refs → billing service
-// Unit refs       → landlord notification + tenant receipt
-type paymentNotifier struct {
-	tw      *notifier.Twilio
-	billing *billing.Handler
-}
+// paymentNotifier satisfies mpesa.NotifierService.
+// Billing routing is handled inside mpesa.Handler — not here.
+// This adapter only handles rent payment notifications.
+type paymentNotifier struct{ tw *notifier.Twilio }
 
 func (n *paymentNotifier) NotifyLandlord(ctx context.Context, phone string, p *models.Payment, unit *models.Unit) error {
 	return n.tw.NotifyLandlord(ctx, phone, p, unit)
@@ -239,14 +242,14 @@ func (n *paymentNotifier) NotifyTenant(ctx context.Context, phone string, p *mod
 	return n.tw.NotifyTenant(ctx, phone, p, unit)
 }
 
-// waSender — bot replies via Twilio WhatsApp.
+// waSender adapts Twilio to bot.Sender — bot replies via WhatsApp.
 type waSender struct{ tw *notifier.Twilio }
 
 func (b *waSender) Send(ctx context.Context, to, msg string) error {
 	return b.tw.SendRaw(ctx, to, msg)
 }
 
-// smsSender — onboarding welcome messages via Twilio SMS.
+// smsSender adapts Twilio to bot.Sender — onboarding replies via SMS.
 type smsSender struct{ tw *notifier.Twilio }
 
 func (s *smsSender) Send(ctx context.Context, to, msg string) error {
