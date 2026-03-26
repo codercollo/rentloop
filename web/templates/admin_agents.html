@@ -19,7 +19,9 @@
         <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
           Units
         </th>
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Fee</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Monthly Fee
+        </th>
         <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
           Since
         </th>
@@ -38,15 +40,32 @@
           {{if .MonthlyFee}}
           <span class="text-emerald-400 font-medium">KES {{.MonthlyFee}}</span>
           {{else}}
-          <span class="text-gray-500">Free</span>
+          <span class="text-gray-500">Free tier</span>
           {{end}}
         </td>
         <td class="px-6 py-4 text-gray-500 text-xs">
           {{.CreatedAt.Format "02 Jan 2006"}}
         </td>
       </tr>
+      {{end}} {{if not .Agents}}
+      <tr>
+        <td colspan="6" class="px-6 py-8 text-gray-500 text-sm text-center">
+          No agents registered yet.
+        </td>
+      </tr>
       {{end}}
     </tbody>
   </table>
+</div>
+
+<div class="mt-6 bg-gray-900 border border-gray-800 rounded-xl p-5">
+  <h3 class="font-semibold text-sm text-gray-400 mb-2">Billing note</h3>
+  <p class="text-xs text-gray-500">
+    Agents are billed on the total units across all their landlords, the same
+    KES 50/unit model as landlords. Units ≤ 10 are free. Above 10, the agent
+    pays via Paybill using ref
+    <span class="font-mono text-gray-400">RENTLOOP-{agentID}</span>. Unit counts
+    above are live totals from landlord records, not a cached field.
+  </p>
 </div>
 {{end}}

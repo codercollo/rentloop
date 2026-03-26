@@ -210,9 +210,18 @@ type AgentRow struct {
 // GetAllAgents returns all agents with their portfolio stats.
 func (r *Repository) GetAllAgents(ctx context.Context) ([]AgentRow, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT a.id, a.whatsapp_phone, a.name, a.unit_count, a.created_at,
-		       COUNT(l.id)                                                    AS landlord_count,
-		       CASE WHEN a.unit_count > 10 THEN a.unit_count * 50 ELSE 0 END AS monthly_fee
+		SELECT
+			a.id,
+			a.whatsapp_phone,
+			a.name,
+			a.created_at,
+			COUNT(l.id)                                AS landlord_count,
+			COALESCE(SUM(l.unit_count), 0)             AS total_units,
+			CASE
+				WHEN COALESCE(SUM(l.unit_count), 0) > 10
+				THEN COALESCE(SUM(l.unit_count), 0) * 50
+				ELSE 0
+			END                                        AS monthly_fee
 		FROM   agents a
 		LEFT   JOIN landlords l ON l.agent_id = a.id
 		GROUP  BY a.id
@@ -227,8 +236,8 @@ func (r *Repository) GetAllAgents(ctx context.Context) ([]AgentRow, error) {
 	for rows.Next() {
 		var row AgentRow
 		if err := rows.Scan(
-			&row.ID, &row.WhatsAppPhone, &row.Name, &row.UnitCount, &row.CreatedAt,
-			&row.LandlordCount, &row.MonthlyFee,
+			&row.ID, &row.WhatsAppPhone, &row.Name, &row.CreatedAt,
+			&row.LandlordCount, &row.UnitCount, &row.MonthlyFee,
 		); err != nil {
 			return nil, err
 		}
