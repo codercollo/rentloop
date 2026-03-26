@@ -63,12 +63,12 @@ func (r *Repository) GetExpiredPaidAccounts(ctx context.Context) ([]models.Landl
 // GetGraceAccounts returns accounts in grace period past the grace deadline.
 func (r *Repository) GetGraceAccounts(ctx context.Context, graceDays int) ([]models.Landlord, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, whatsapp_phone, name, paybill_number,
-		       subscription_status, billing_cycle_end, unit_count, created_at
-		FROM   landlords
-		WHERE  subscription_status = 'grace'
-		  AND  billing_cycle_end   < NOW() - ($1 || ' days')::interval
-	`, graceDays)
+    SELECT id, whatsapp_phone, name, paybill_number,
+           subscription_status, billing_cycle_end, unit_count, created_at
+    FROM   landlords
+    WHERE  subscription_status = 'grace'
+      AND  billing_cycle_end   < NOW() - ($1 * INTERVAL '1 day')
+`, graceDays)
 	if err != nil {
 		return nil, fmt.Errorf("get grace accounts: %w", err)
 	}
