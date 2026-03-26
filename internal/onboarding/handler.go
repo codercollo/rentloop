@@ -39,22 +39,32 @@ type pendingState struct {
 	startedAt time.Time
 }
 
+// knownCommands is the set of bot commands we detect mid-onboarding
+// to avoid treating a mistyped command as an apartment name.
+var knownCommands = []string{
+	"LIST", "REMIND", "TOTAL", "HELP", "MARK",
+	"ADD", "CLAIM", "RECEIPT", "HISTORY", "REPLACE",
+	"SET", "BULK", "JOIN",
+}
+
 // Service handles all onboarding logic.
 type Service struct {
-	repo    Repository
-	sender  Sender
-	sms     SMSNotifier
-	mu      sync.Mutex
-	pending map[string]pendingState // key: whatsapp phone
+	repo       Repository
+	sender     Sender
+	sms        SMSNotifier
+	ownerPhone string
+	mu         sync.Mutex
+	pending    map[string]pendingState
 }
 
 // NewService wires all dependencies.
-func NewService(repo Repository, sender Sender, sms SMSNotifier) *Service {
+func NewService(repo Repository, sender Sender, sms SMSNotifier, ownerPhone string) *Service {
 	return &Service{
-		repo:    repo,
-		sender:  sender,
-		sms:     sms,
-		pending: make(map[string]pendingState),
+		repo:       repo,
+		sender:     sender,
+		sms:        sms,
+		ownerPhone: ownerPhone,
+		pending:    make(map[string]pendingState),
 	}
 }
 
@@ -105,10 +115,28 @@ func (s *Service) HandleApartmentName(ctx context.Context, from, apartmentName s
 	delete(s.pending, from)
 	s.mu.Unlock()
 
+	// ── Command-detection guard ───────────────────────────────────────────
+	// If the landlord typed a bot command instead of their apartment name,
+	// remind them what we need and keep them in the pending state.
+	// Without this, "LIST" would be registered as an apartment name.
+	upperBody := strings.ToUpper(strings.TrimSpace(apartmentName))
+	for _, cmd := range knownCommands {
+		if strings.HasPrefix(upperBody, cmd) {
+			s.send(ctx, from,
+				"Please send the name of your apartment to complete registration.\n\n"+
+					"_Example: Sunrise Apartments, Kilimani Court_",
+			)
+			s.mu.Lock()
+			s.pending[from] = pendingState{startedAt: time.Now()}
+			s.mu.Unlock()
+			return
+		}
+	}
+
+	// ── Empty input guard ─────────────────────────────────────────────────
 	apartmentName = strings.TrimSpace(apartmentName)
 	if apartmentName == "" {
 		s.send(ctx, from, "Please send the name of your apartment to continue registration.")
-		// Re-mark as pending
 		s.mu.Lock()
 		s.pending[from] = pendingState{startedAt: time.Now()}
 		s.mu.Unlock()
@@ -136,6 +164,25 @@ func (s *Service) HandleApartmentName(ctx context.Context, from, apartmentName s
 		"apartment", created.ApartmentName,
 	)
 
+	// Alert owner of new signup so they can follow up for Daraja credentials.
+	if s.ownerPhone != "" {
+		alert := fmt.Sprintf(
+			"*New RentLoop signup* 🔔\n\n"+
+				"Apartment: %s\n"+
+				"Phone: %s\n"+
+				"ID: %s\n\n"+
+				"Follow up for Daraja credentials and paybill shortcode.",
+			created.ApartmentName,
+			created.WhatsAppPhone,
+			shortID(created.ID),
+		)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			s.send(ctx, s.ownerPhone, alert)
+		}()
+	}
+
 	welcome := fmt.Sprintf(
 		"*%s is now on RentLoop!* 🎉\n\n"+
 			"Tenants pay to Paybill *%s* using their unit ref as the account number.\n\n"+
@@ -152,6 +199,13 @@ func (s *Service) HandleApartmentName(ctx context.Context, from, apartmentName s
 	)
 
 	s.send(ctx, from, welcome)
+}
+
+func shortID(id string) string {
+	if len(id) >= 8 {
+		return id[:8]
+	}
+	return id
 }
 
 // HandleBulkAdd processes a CSV file attachment sent via WhatsApp.
@@ -200,7 +254,7 @@ func (s *Service) HandleBulkAdd(ctx context.Context, from, fileURL string) {
 				u.TenantName,
 				u.UnitRef,
 				landlord.PaybillNumber,
-				landlord.ApartmentName, // ← passed through
+				landlord.ApartmentName,
 				u.ExpectedRent,
 			); err != nil {
 				slog.Error("onboarding: tenant SMS failed", "unit", u.UnitRef, "error", err)

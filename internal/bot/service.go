@@ -11,7 +11,6 @@ import (
 
 	"github.com/codercollo/rentloop/internal/matcher"
 	"github.com/codercollo/rentloop/internal/models"
-	"github.com/codercollo/rentloop/internal/onboarding"
 )
 
 // Sender sends outbound WhatsApp messages.
@@ -19,11 +18,23 @@ type Sender interface {
 	Send(ctx context.Context, to, message string) error
 }
 
-// SMSNotifier sends onboarding SMS to tenants.
 // SMSNotifier sends reminder and onboarding SMS to tenants.
 type SMSNotifier interface {
 	SendReminder(ctx context.Context, phone, tenantName, unitRef string, expectedRent int, month string) error
 	SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill, apartmentName string, expectedRent int) error
+}
+
+// OnboardingService is the subset of onboarding.Service that bot needs.
+// Using an interface here avoids a circular import:
+//
+//	bot/service.go → onboarding (concrete) → bot/repository.go (already imports bot)
+//
+// The interface is satisfied implicitly by *onboarding.Service.
+type OnboardingService interface {
+	IsPendingApartmentName(phone string) bool
+	HandleJoin(ctx context.Context, from string)
+	HandleApartmentName(ctx context.Context, from, apartmentName string)
+	HandleBulkAdd(ctx context.Context, from, fileURL string)
 }
 
 // BotRepository is the persistence interface the service depends on.
@@ -49,7 +60,7 @@ type Service struct {
 	repo       BotRepository
 	sender     Sender
 	sms        SMSNotifier
-	onboarding *onboarding.Service
+	onboarding OnboardingService
 }
 
 // NewService wires all dependencies.
@@ -59,24 +70,28 @@ func NewService(repo BotRepository, sender Sender, sms SMSNotifier) *Service {
 
 // SetOnboarding injects the onboarding service after construction.
 // Called from main.go after both services are initialised.
-func (s *Service) SetOnboarding(svc *onboarding.Service) {
+// Accepts OnboardingService interface — *onboarding.Service satisfies it implicitly.
+func (s *Service) SetOnboarding(svc OnboardingService) {
 	s.onboarding = svc
 }
 
 // Handle is the main dispatch entry point called by the HTTP handler.
 func (s *Service) Handle(ctx context.Context, from, text string) {
-	upper := strings.ToUpper(strings.TrimSpace(text))
-
-	// Mid-onboarding: landlord is supplying their apartment name
+	// ── Onboarding gate — must be checked BEFORE identify() ──────────────
+	// If this phone is mid-JOIN flow waiting to supply their apartment name,
+	// route their reply directly to onboarding. Do not attempt command parsing
+	// and do not hit the DB to identify them — they aren't registered yet.
 	if s.onboarding != nil && s.onboarding.IsPendingApartmentName(from) {
 		s.onboarding.HandleApartmentName(ctx, from, text)
 		return
 	}
 
+	upper := strings.ToUpper(strings.TrimSpace(text))
+
 	landlord, agent, err := s.identify(ctx, from)
 	if err != nil {
 		if errors.Is(err, models.ErrNotFound) {
-			// Unknown sender — could be a new landlord trying to register
+			// Unknown sender — only valid action is JOIN
 			if upper == "JOIN" {
 				if s.onboarding != nil {
 					s.onboarding.HandleJoin(ctx, from)
@@ -100,7 +115,7 @@ func (s *Service) Handle(ctx context.Context, from, text string) {
 		return
 	}
 
-	// Suspended — lockout
+	// Suspended — full lockout, show payment instructions only
 	if landlord.SubscriptionStatus == models.StatusSuspended {
 		amount := landlord.UnitCount * 50
 		s.reply(ctx, from, fmt.Sprintf(
@@ -113,7 +128,7 @@ func (s *Service) Handle(ctx context.Context, from, text string) {
 		return
 	}
 
-	// Grace — process command but append warning
+	// Grace — process command but append billing warning
 	graceWarning := ""
 	if landlord.SubscriptionStatus == models.StatusGrace {
 		amount := landlord.UnitCount * 50
@@ -130,6 +145,7 @@ func (s *Service) Handle(ctx context.Context, from, text string) {
 }
 
 // identify returns the landlord or agent for the given phone number.
+// Agent lookup runs first — an agent phone never collides with a landlord phone.
 func (s *Service) identify(ctx context.Context, phone string) (*models.Landlord, *models.Agent, error) {
 	agent, err := s.repo.GetAgentByPhone(ctx, phone)
 	if err == nil {
@@ -146,7 +162,7 @@ func (s *Service) identify(ctx context.Context, phone string) (*models.Landlord,
 	return landlord, nil, nil
 }
 
-// monthKey returns the current YYYY-MM in EAT.
+// monthKey returns the current YYYY-MM string in Africa/Nairobi time.
 func monthKey() string {
 	eat, err := time.LoadLocation("Africa/Nairobi")
 	if err != nil {
@@ -155,7 +171,7 @@ func monthKey() string {
 	return time.Now().In(eat).Format("2006-01")
 }
 
-// shortID returns the first 8 chars of an ID safely.
+// shortID returns the first 8 chars of a UUID safely.
 func shortID(id string) string {
 	if len(id) >= 8 {
 		return id[:8]

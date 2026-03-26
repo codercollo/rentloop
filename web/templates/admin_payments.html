@@ -1,18 +1,24 @@
-{{define "title"}}{{if .Unmatched}}Unmatched{{else}}Payments{{end}} — RentLoop{{end}}
-{{define "content"}}
+{{define "title"}}{{if .Unmatched}}Unmatched{{else}}Payments{{end}} —
+RentLoop{{end}} {{define "content"}}
 <div class="mb-6 flex items-center justify-between">
   <div>
-    <h2 class="text-2xl font-bold">{{if .Unmatched}}Unmatched Payments{{else}}Recent Payments{{end}}</h2>
+    <h2 class="text-2xl font-bold">
+      {{if .Unmatched}}Unmatched Payments{{else}}Recent Payments{{end}}
+    </h2>
     <p class="text-gray-500 text-sm mt-1">{{len .Payments}} records</p>
   </div>
   {{if not .Unmatched}}
-  <a href="/admin/payments/unmatched"
-     class="px-4 py-2 border border-gray-700 text-gray-400 rounded-lg text-sm hover:border-red-500/50 hover:text-red-400 transition">
+  <a
+    href="/admin/payments/unmatched"
+    class="px-4 py-2 border border-gray-700 text-gray-400 rounded-lg text-sm hover:border-red-500/50 hover:text-red-400 transition"
+  >
     Unmatched
   </a>
   {{else}}
-  <a href="/admin/payments"
-     class="px-4 py-2 border border-gray-700 text-gray-400 rounded-lg text-sm hover:border-gray-500 transition">
+  <a
+    href="/admin/payments"
+    class="px-4 py-2 border border-gray-700 text-gray-400 rounded-lg text-sm hover:border-gray-500 transition"
+  >
     All payments
   </a>
   {{end}}
@@ -21,31 +27,68 @@
   <table class="w-full text-sm">
     <thead>
       <tr class="border-b border-gray-800">
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Date</th>
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Landlord</th>
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Unit</th>
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Amount</th>
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Status</th>
-        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">Transaction</th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Date
+        </th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Landlord
+        </th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Unit
+        </th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Amount
+        </th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Status
+        </th>
+        <th class="text-left px-6 py-3 text-gray-500 text-xs uppercase">
+          Transaction
+        </th>
       </tr>
     </thead>
     <tbody>
-    {{range .Payments}}
-    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
-      <td class="px-6 py-4 text-gray-400 text-xs">{{.PaidAt.Format "02 Jan 15:04"}}</td>
-      <td class="px-6 py-4 font-medium">{{.LandlordName}}</td>
-      <td class="px-6 py-4 font-mono text-indigo-400 text-xs">{{.UnitRef}}</td>
-      <td class="px-6 py-4 font-medium">KES {{.Amount}}</td>
-      <td class="px-6 py-4">
-        {{if eq .Status "paid"}}<span class="px-2 py-0.5 bg-green-500/15 text-green-400 text-xs rounded-full">paid</span>
-        {{else if eq .Status "partial"}}<span class="px-2 py-0.5 bg-yellow-500/15 text-yellow-400 text-xs rounded-full">partial</span>
-        {{else if eq .Status "unmatched"}}<span class="px-2 py-0.5 bg-red-500/15 text-red-400 text-xs rounded-full">unmatched</span>
-        {{else if eq .Status "overpaid"}}<span class="px-2 py-0.5 bg-indigo-500/15 text-indigo-400 text-xs rounded-full">overpaid</span>
-        {{else}}<span class="text-gray-500 text-xs">{{.Status}}</span>{{end}}
-      </td>
-      <td class="px-6 py-4 font-mono text-gray-500 text-xs">{{.TransactionID}}</td>
-    </tr>
-    {{end}}
+      {{range .Payments}}
+      <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
+        <td class="px-6 py-4 text-gray-400 text-xs">
+          {{.PaidAt.Format "02 Jan 15:04"}}
+        </td>
+        <td class="px-6 py-4 font-medium">{{.LandlordName}}</td>
+        <td class="px-6 py-4 font-mono text-indigo-400 text-xs">
+          {{.UnitRef}}
+        </td>
+        <td class="px-6 py-4 font-medium">KES {{.Amount}}</td>
+        <td class="px-6 py-4">
+          {{/* FIX BUG 6: printf "%s" converts models.PaymentStatus to plain
+          string for eq */}} {{if eq (printf "%s" .Status) "paid"}}
+          <span
+            class="px-2 py-0.5 bg-green-500/15 text-green-400 text-xs rounded-full"
+            >paid</span
+          >
+          {{else if eq (printf "%s" .Status) "partial"}}
+          <span
+            class="px-2 py-0.5 bg-yellow-500/15 text-yellow-400 text-xs rounded-full"
+            >partial</span
+          >
+          {{else if eq (printf "%s" .Status) "unmatched"}}
+          <span
+            class="px-2 py-0.5 bg-red-500/15 text-red-400 text-xs rounded-full"
+            >unmatched</span
+          >
+          {{else if eq (printf "%s" .Status) "overpaid"}}
+          <span
+            class="px-2 py-0.5 bg-indigo-500/15 text-indigo-400 text-xs rounded-full"
+            >overpaid</span
+          >
+          {{else}}
+          <span class="text-gray-500 text-xs">{{printf "%s" .Status}}</span>
+          {{end}}
+        </td>
+        <td class="px-6 py-4 font-mono text-gray-500 text-xs">
+          {{.TransactionID}}
+        </td>
+      </tr>
+      {{end}}
     </tbody>
   </table>
 </div>

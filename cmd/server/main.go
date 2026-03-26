@@ -76,7 +76,7 @@ func main() {
 	botHandler := bot.NewHandler(botSvc)
 	smsHandler := bot.NewSMSHandler(botSvc)
 
-	onboardingSvc := onboarding.NewService(botRepo, &smsSender{tw}, tw)
+	onboardingSvc := onboarding.NewService(botRepo, &smsSender{tw}, tw, os.Getenv("OWNER_PHONE"))
 	botSvc.SetOnboarding(onboardingSvc)
 
 	// ── Billing ───────────────────────────────────────────────────────────────
@@ -180,6 +180,7 @@ func main() {
 		r.Get("/admin/dashboard", adminHandler.Dashboard)
 		r.Get("/admin/clients", adminHandler.Clients)
 		r.Get("/admin/clients/{id}", adminHandler.ClientDetail)
+		r.Post("/admin/clients/{id}/activate", adminHandler.ActivateClient)
 		r.Get("/admin/agents", adminHandler.Agents)
 		r.Get("/admin/payments", adminHandler.Payments)
 		r.Get("/admin/payments/unmatched", adminHandler.UnmatchedPayments)
