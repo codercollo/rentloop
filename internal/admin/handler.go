@@ -22,8 +22,8 @@ func NewHandler(repo *Repository, _ *template.Template) *Handler {
 }
 
 // parse loads base + one page template and returns a ready-to-execute template.
-// This is the key fix: each page gets its own template.Template instance,
-// preventing {{define "content"}} blocks from overwriting each other.
+// Each page gets its own template.Template instance, preventing
+// {{define "content"}} blocks from overwriting each other.
 func parse(page string) *template.Template {
 	return template.Must(template.ParseFiles(baseTemplate, "web/templates/"+page))
 }
@@ -124,11 +124,24 @@ func (h *Handler) ClientDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "client not found", http.StatusNotFound)
 		return
 	}
-	render(w, "admin_client_detail.html", nav(r, map[string]any{
+	render(w, "admin_client_detail.html", nav(r, map[string]any{ // FIX BUG 9: no trailing 's'
 		"Landlord": detail.Landlord,
 		"Units":    detail.Units,
 		"Payments": detail.Payments,
 	}))
+}
+
+// ActivateClient manually sets a landlord's subscription to active.
+// Used after you receive Daraja credentials from a new signup.
+// Route: POST /admin/clients/{id}/activate
+func (h *Handler) ActivateClient(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if err := h.repo.ActivateLandlord(r.Context(), id); err != nil {
+		http.Error(w, "could not activate client", http.StatusInternalServerError)
+		return
+	}
+	// Redirect back to the detail page so the admin sees the updated status badge.
+	http.Redirect(w, r, "/admin/clients/"+id, http.StatusSeeOther)
 }
 
 func (h *Handler) Agents(w http.ResponseWriter, r *http.Request) {

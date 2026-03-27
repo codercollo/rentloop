@@ -1,69 +1,138 @@
-{{define "title"}}{{.Landlord.Name}} — RentLoop{{end}}
-{{define "content"}}
+{{define "title"}}{{.Landlord.Name}} — RentLoop{{end}} {{define "content"}}
 <div class="mb-6">
-  <a href="/admin/clients" class="text-gray-500 text-sm hover:text-gray-300 transition">← Clients</a>
+  <a
+    href="/admin/clients"
+    class="text-gray-500 text-sm hover:text-gray-300 transition"
+    >← Clients</a
+  >
   <div class="mt-3 flex items-center gap-4">
     <h2 class="text-2xl font-bold">{{.Landlord.Name}}</h2>
     {{if eq (printf "%s" .Landlord.SubscriptionStatus) "active"}}
-      <span class="px-3 py-1 bg-green-500/15 text-green-400 text-xs rounded-full">active</span>
+    <span class="px-3 py-1 bg-green-500/15 text-green-400 text-xs rounded-full"
+      >active</span
+    >
     {{else if eq (printf "%s" .Landlord.SubscriptionStatus) "grace"}}
-      <span class="px-3 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full">grace</span>
+    <span
+      class="px-3 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full"
+      >grace</span
+    >
     {{else}}
-      <span class="px-3 py-1 bg-red-500/15 text-red-400 text-xs rounded-full">suspended</span>
+    <span class="px-3 py-1 bg-red-500/15 text-red-400 text-xs rounded-full"
+      >suspended</span
+    >
+    {{end}} {{/* Activate button — shown when not already active */}} {{if ne
+    (printf "%s" .Landlord.SubscriptionStatus) "active"}}
+    <form method="POST" action="/admin/clients/{{.Landlord.ID}}/activate">
+      <button
+        type="submit"
+        class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg transition"
+      >
+        Activate
+      </button>
+    </form>
     {{end}}
   </div>
-  <div class="flex gap-6 mt-2 text-sm text-gray-500">
+  <div class="flex flex-wrap gap-6 mt-2 text-sm text-gray-500">
     <span>📱 {{.Landlord.WhatsAppPhone}}</span>
     <span>🏠 {{.Landlord.UnitCount}} units</span>
     <span>🏦 Paybill {{.Landlord.PaybillNumber}}</span>
+    {{if .Landlord.ApartmentName}}<span>🏢 {{.Landlord.ApartmentName}}</span
+    >{{end}}
   </div>
 </div>
+
 <div class="grid lg:grid-cols-2 gap-6">
+  {{/* Units table */}}
   <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-800">
       <h3 class="font-semibold">Units ({{len .Units}})</h3>
     </div>
+    {{if .Units}}
     <table class="w-full text-sm">
-      <thead><tr class="border-b border-gray-800">
-        <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">Unit</th>
-        <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">Tenant</th>
-        <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">Rent</th>
-      </tr></thead>
+      <thead>
+        <tr class="border-b border-gray-800">
+          <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">
+            Unit
+          </th>
+          <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">
+            Tenant
+          </th>
+          <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">
+            Rent
+          </th>
+        </tr>
+      </thead>
       <tbody>
-      {{range .Units}}
-      <tr class="border-b border-gray-800/50">
-        <td class="px-4 py-3 font-mono text-indigo-400 font-medium">{{.UnitRef}}</td>
-        <td class="px-4 py-3"><p class="font-medium">{{.TenantName}}</p><p class="text-gray-500 text-xs">{{.TenantPhone}}</p></td>
-        <td class="px-4 py-3 text-emerald-400 font-medium">KES {{.ExpectedRent}}</td>
-      </tr>
-      {{end}}
+        {{range .Units}}
+        <tr class="border-b border-gray-800/50">
+          <td class="px-4 py-3 font-mono text-indigo-400 font-medium">
+            {{.UnitRef}}
+          </td>
+          <td class="px-4 py-3">
+            <p class="font-medium">{{.TenantName}}</p>
+            <p class="text-gray-500 text-xs">{{.TenantPhone}}</p>
+          </td>
+          <td class="px-4 py-3 text-emerald-400 font-medium">
+            KES {{.ExpectedRent}}
+          </td>
+        </tr>
+        {{end}}
       </tbody>
     </table>
+    {{else}}
+    <p class="px-6 py-8 text-gray-500 text-sm text-center">
+      No units added yet.
+    </p>
+    {{end}}
   </div>
+
+  {{/* Payments table */}}
   <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-800">
       <h3 class="font-semibold">Recent Payments</h3>
     </div>
+    {{if .Payments}}
     <table class="w-full text-sm">
-      <thead><tr class="border-b border-gray-800">
-        <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">Date</th>
-        <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">Amount</th>
-        <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">Status</th>
-      </tr></thead>
+      <thead>
+        <tr class="border-b border-gray-800">
+          <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">
+            Date
+          </th>
+          <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">
+            Amount
+          </th>
+          <th class="text-left px-4 py-3 text-gray-500 text-xs uppercase">
+            Status
+          </th>
+        </tr>
+      </thead>
       <tbody>
-      {{range .Payments}}
-      <tr class="border-b border-gray-800/50">
-        <td class="px-4 py-3 text-gray-400 text-xs">{{.PaidAt.Format "02 Jan 15:04"}}</td>
-        <td class="px-4 py-3 font-medium">KES {{.Amount}}</td>
-        <td class="px-4 py-3">
-          {{if eq (printf "%s" .Status) "paid"}}<span class="text-green-400 text-xs">paid</span>
-          {{else if eq (printf "%s" .Status) "partial"}}<span class="text-yellow-400 text-xs">partial</span>
-          {{else}}<span class="text-red-400 text-xs">{{.Status}}</span>{{end}}
-        </td>
-      </tr>
-      {{end}}
+        {{range .Payments}}
+        <tr class="border-b border-gray-800/50">
+          <td class="px-4 py-3 text-gray-400 text-xs">
+            {{.PaidAt.Format "02 Jan 15:04"}}
+          </td>
+          <td class="px-4 py-3 font-medium">KES {{.Amount}}</td>
+          <td class="px-4 py-3">
+            {{if eq (printf "%s" .Status) "paid"}}
+            <span class="text-green-400 text-xs">paid</span>
+            {{else if eq (printf "%s" .Status) "partial"}}
+            <span class="text-yellow-400 text-xs">partial</span>
+            {{else if eq (printf "%s" .Status) "overpaid"}}
+            <span class="text-indigo-400 text-xs">overpaid</span>
+            {{else if eq (printf "%s" .Status) "unmatched"}}
+            <span class="text-red-400 text-xs">unmatched</span>
+            {{else}}
+            <span class="text-gray-500 text-xs">{{printf "%s" .Status}}</span>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
       </tbody>
     </table>
+    {{else}}
+    <p class="px-6 py-8 text-gray-500 text-sm text-center">No payments yet.</p>
+    {{end}}
   </div>
 </div>
 {{end}}

@@ -133,7 +133,9 @@ func (s *Service) ProcessPayment(ctx context.Context, transactionID, ref string,
 			"Thank you!",
 		amount, now.AddDate(0, 1, 0).Format("02 Jan 2006"),
 	)
-	_ = s.notifier.Send(ctx, landlord.WhatsAppPhone, msg)
+	if s.notifier != nil {
+		_ = s.notifier.Send(ctx, landlord.WhatsAppPhone, msg)
+	}
 	return nil
 }
 
@@ -164,7 +166,9 @@ func (s *Service) TransitionExpired(ctx context.Context) error {
 				"All your data is safe.",
 			amount, l.PaybillNumber, SubscriptionRef(l.ID), s.graceDays,
 		)
-		_ = s.notifier.Send(ctx, l.WhatsAppPhone, msg)
+		if s.notifier != nil {
+			_ = s.notifier.Send(ctx, l.WhatsAppPhone, msg)
+		}
 
 		slog.Info("billing: moved to grace", "landlord_id", l.ID)
 	}
@@ -197,7 +201,9 @@ func (s *Service) TransitionGrace(ctx context.Context) error {
 				"Your payment history is safe and will be restored on payment.",
 			amount, l.PaybillNumber, SubscriptionRef(l.ID),
 		)
-		_ = s.notifier.Send(ctx, l.WhatsAppPhone, msg)
+		if s.notifier != nil {
+			_ = s.notifier.Send(ctx, l.WhatsAppPhone, msg)
+		}
 
 		slog.Info("billing: suspended", "landlord_id", l.ID)
 	}
