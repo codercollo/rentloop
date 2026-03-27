@@ -132,6 +132,9 @@ func main() {
 	r.Use(chimw.Recoverer)
 	r.Use(requestLogger)
 	r.Use(chimw.Timeout(30 * time.Second))
+	r.Use(appMiddleware.CORS(appMiddleware.CORSOptions{
+		AllowedOrigins: []string{"https://rentloop.co.ke"},
+	}))
 
 	// ── Public ────────────────────────────────────────────────────────────────
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -158,10 +161,13 @@ func main() {
 	r.Handle("/static/*", http.StripPrefix("/static/",
 		http.FileServer(http.Dir("web/static"))))
 
-	// ── Webhooks ─────────────────────────────────────────────────────────────
-	r.Post("/mpesa/c2b/callback", mpesaHandler.Callback)
-	r.Post("/bot/whatsapp", botHandler.Inbound)
-	r.Post("/bot/sms", smsHandler.Inbound)
+	// ── Webhooks ─────────────────────────────────────────────────────────────────
+	whatsappValidate := appMiddleware.ValidateTwilio(cfg.TwilioToken, cfg.WhatsAppWebhookURL, cfg.IsDevelopment())
+	smsValidate := appMiddleware.ValidateTwilio(cfg.TwilioToken, cfg.SMSWebhookURL, cfg.IsDevelopment())
+
+	r.With(appMiddleware.WhatsAppRateLimit, whatsappValidate).Post("/bot/whatsapp", botHandler.Inbound)
+	r.With(appMiddleware.SMSRateLimit, smsValidate).Post("/bot/sms", smsHandler.Inbound)
+	r.With(appMiddleware.MpesaRateLimit).Post("/mpesa/c2b/callback", mpesaHandler.Callback)
 
 	// ── Admin auth — public ───────────────────────────────────────────────────
 	r.Get("/admin/login", authHandler.ShowLogin)

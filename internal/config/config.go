@@ -1,11 +1,4 @@
-// Package config loads and validates application configuration
-// from .env
-//
-// It centralizes all runtime settings including database
-// connectivity, M-Pesa credentials, messaging provides,
-// authentication secrets, storage configuration, and billing
-// parameters. The application will not start if required
-// variables are missing or invalid
+// Package config loads and validates application configuration from .env
 package config
 
 import (
@@ -16,57 +9,63 @@ import (
 	"strings"
 )
 
-// Config holds every value the application needs
-// All fields are populated from environment variables
+// Config holds every value the application needs.
+// All fields are populated from environment variables.
 type Config struct {
-	//App
+	// App
 	Port   string
 	AppEnv string // development | production
 
-	//Database
+	// Database
 	DatabaseURL string
 
-	//M-Pesa daraja
+	// M-Pesa daraja
 	MpesaEnv            string
 	MpesaConsumerKey    string
 	MpesaConsumerSecret string
 	MpesaPaybill        string
 	MpesaPasskey        string
 
-	//Africa's  Talking
+	// Africa's Talking
 	ATAPIKey         string
 	ATUsername       string
 	ATWhatsAppNumber string
 	ATSMSSender      string
 
-	// Twilio Config
+	// Twilio
 	TwilioSID          string
 	TwilioToken        string
 	TwilioWhatsAppFrom string
 	TwilioSMSFrom      string
 
-	//Admin Auth
+	// Twilio webhook URLs — used for signature validation.
+	// Set these to the full public URL Twilio posts to, e.g.
+	// https://rentloop.co.ke/bot/whatsapp
+	WhatsAppWebhookURL string
+	SMSWebhookURL      string
+
+	// Admin auth
 	JWTSecret        string
 	ActivationSecret string
 
-	//DigitalOcean Space
+	// DigitalOcean Spaces
 	DOSpacesKey      string
 	DOSpacesSecret   string
 	DOSpacesBucket   string
 	DOSpacesRegion   string
 	DOSpacesEndpoint string
 
-	//Billing
+	// Billing
 	BillingGraceDays         int
 	SubscriptionPricePerUnit int
 	FreeTierUnitLimit        int
 
-	//Admin setup
+	// Admin setup
 	AdminSetupSecret string
 }
 
-// Load reads environment varibles, validates required fields,
-// and returns a populated Config or error
+// Load reads environment variables, validates required fields,
+// and returns a populated Config or an error.
 func Load() (*Config, error) {
 	cfg := &Config{
 		Port:   getEnv("PORT", "8080"),
@@ -90,6 +89,9 @@ func Load() (*Config, error) {
 		TwilioWhatsAppFrom: getEnv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886"),
 		TwilioSMSFrom:      getEnv("TWILIO_SMS_FROM", "+14155238886"),
 
+		WhatsAppWebhookURL: getEnv("WHATSAPP_WEBHOOK_URL", ""),
+		SMSWebhookURL:      getEnv("SMS_WEBHOOK_URL", ""),
+
 		JWTSecret:        os.Getenv("JWT_SECRET"),
 		ActivationSecret: os.Getenv("ACTIVATION_SECRET"),
 
@@ -111,17 +113,17 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// IsDevelopment returns true when running outside production
+// IsDevelopment returns true when running outside production.
 func (c *Config) IsDevelopment() bool {
 	return c.AppEnv != "production"
 }
 
-// IsProduction returns true in the production environment
+// IsProduction returns true in the production environment.
 func (c *Config) IsProduction() bool {
 	return c.AppEnv == "production"
 }
 
-// validate checks all required fields and returns a single error
+// validate checks all required fields and returns a combined error.
 func (c *Config) validate() error {
 	required := map[string]string{
 		"DATABASE_URL":          c.DatabaseURL,
@@ -142,29 +144,29 @@ func (c *Config) validate() error {
 		"DO_SPACES_ENDPOINT":    c.DOSpacesEndpoint,
 	}
 
+	// Webhook URLs are only required in production — in development
+	// ValidateTwilio is skipped entirely so blank values are fine.
+	if c.IsProduction() {
+		required["WHATSAPP_WEBHOOK_URL"] = c.WhatsAppWebhookURL
+		required["SMS_WEBHOOK_URL"] = c.SMSWebhookURL
+	}
+
 	var missing []string
 	for key, val := range required {
 		if strings.TrimSpace(val) == "" {
 			missing = append(missing, key)
 		}
 	}
-
 	if len(missing) > 0 {
-		return fmt.Errorf(
-			"missing required environment variables: %s",
-			strings.Join(missing, ", "),
-		)
+		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
-	//JWT
 	if len(c.JWTSecret) < 32 {
 		return errors.New("JWT_SECRET must be at least 32 characters")
 	}
-
 	return nil
 }
 
-// getEnx returns the environment variable value or a fallback default
 func getEnv(key, fallback string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
@@ -172,7 +174,6 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// getEnvInt returns the environment variable
 func getEnvInt(key string, fallback int) int {
 	val := os.Getenv(key)
 	if val == "" {
