@@ -87,7 +87,7 @@ func (s *Service) runDigest() {
 		fmt.Fprintf(sb, "Still unpaid:\n%s\n\n", strings.Join(unpaid, "\n"))
 		fmt.Fprintf(sb, "Reply *REMIND* to send nudges.")
 
-		if err := s.sender.Send(ctx, l.WhatsAppPhone, sb.String()); err != nil {
+		if err := s.wa.Send(ctx, l.WhatsAppPhone, sb.String()); err != nil {
 			slog.Error("digest: send failed",
 				"landlord_id", l.ID,
 				"phone", l.WhatsAppPhone,

@@ -1,5 +1,5 @@
 // Package notifier sends outbound WhatsApp and SMS messages via external APIs,
-// including Africa’s Talking. It provides helpers to send raw messages and
+// including Africa's Talking. It provides helpers to send raw messages and
 // structured notifications such as landlord payment alerts.
 package notifier
 

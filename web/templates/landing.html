@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RentLoop — Automated Rent Collection for Kenya</title>
+    <title>RentLoop — Automated Paybill Rent Reconciliation for Kenya</title>
 
     <style>
       *,
@@ -57,7 +57,6 @@
         justify-content: space-between;
       }
       .nav-logo {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: 1.2rem;
         font-weight: 800;
         color: var(--green);
@@ -111,7 +110,6 @@
         font-weight: 600;
         text-decoration: none;
         transition: all 0.15s;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .btn-nav:hover {
         background: var(--green-dark);
@@ -122,7 +120,7 @@
       /* ─── Hero ─── */
       .hero {
         padding: 128px 2rem 72px;
-        max-width: 700px;
+        max-width: 720px;
         margin: 0 auto;
         text-align: center;
         position: relative;
@@ -164,7 +162,6 @@
         animation: pulse-dot 2s ease infinite;
       }
       .hero h1 {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: clamp(2.4rem, 5.5vw, 3.75rem);
         font-weight: 800;
         line-height: 1.1;
@@ -176,12 +173,24 @@
         font-style: normal;
         color: var(--green);
       }
+      .hero-kingline {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text);
+        background: var(--green-light);
+        border-left: 3px solid var(--green);
+        padding: 0.65rem 1.1rem;
+        border-radius: 0 8px 8px 0;
+        display: inline-block;
+        margin-bottom: 1.5rem;
+        text-align: left;
+      }
       .hero p {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         color: var(--muted);
         line-height: 1.75;
         margin-bottom: 2.25rem;
-        max-width: 480px;
+        max-width: 500px;
         margin-left: auto;
         margin-right: auto;
         font-weight: 300;
@@ -205,7 +214,6 @@
         font-weight: 600;
         text-decoration: none;
         transition: all 0.15s;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         box-shadow:
           0 2px 0 var(--green-dark),
           0 8px 24px rgba(0, 165, 80, 0.2);
@@ -229,7 +237,6 @@
         font-weight: 500;
         text-decoration: none;
         transition: all 0.15s;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .btn-hero-ghost:hover {
         border-color: var(--green);
@@ -249,7 +256,7 @@
         padding: 1.25rem 2rem;
       }
       .stats-inner {
-        max-width: 680px;
+        max-width: 760px;
         margin: 0 auto;
         display: flex;
         justify-content: space-around;
@@ -260,7 +267,6 @@
         text-align: center;
       }
       .stat-number {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: 1.5rem;
         font-weight: 800;
         color: var(--green);
@@ -270,6 +276,116 @@
         font-size: 0.78rem;
         color: var(--muted);
         margin-top: 0.1rem;
+      }
+
+      /* ─── Problem section ─── */
+      .problem-section {
+        padding: 5.5rem 2rem;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .problem-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3rem;
+        margin-top: 2.75rem;
+        align-items: start;
+      }
+      .problem-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      .problem-list li {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        font-size: 0.92rem;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .problem-list li::before {
+        content: "✗";
+        color: #dc2626;
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+      }
+      .solution-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+      }
+      .solution-list li {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        font-size: 0.92rem;
+        color: var(--text);
+        line-height: 1.6;
+        font-weight: 500;
+      }
+      .solution-list li::before {
+        content: "✓";
+        color: var(--green);
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+      }
+      .problem-col-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+        display: block;
+      }
+      .problem-col-label.before {
+        color: #dc2626;
+      }
+      .problem-col-label.after {
+        color: var(--green);
+      }
+      .problem-divider {
+        width: 1px;
+        background: var(--border);
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+      }
+
+      /* ─── Trust strip ─── */
+      .trust-strip {
+        background: var(--text);
+        padding: 1.1rem 2rem;
+      }
+      .trust-inner {
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2.5rem;
+        flex-wrap: wrap;
+      }
+      .trust-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.6);
+        font-weight: 500;
+      }
+      .trust-item strong {
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .trust-sep {
+        width: 1px;
+        height: 18px;
+        background: rgba(255, 255, 255, 0.15);
       }
 
       /* ─── Demo ─── */
@@ -306,7 +422,6 @@
         margin-bottom: 2rem;
       }
       .demo-header h2 {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: 1.5rem;
         font-weight: 700;
         letter-spacing: -0.03em;
@@ -375,7 +490,7 @@
         display: flex;
         flex-direction: column;
         gap: 0.65rem;
-        min-height: 370px;
+        min-height: 420px;
       }
       .msg-row {
         display: flex;
@@ -399,7 +514,7 @@
         flex-shrink: 0;
       }
       .msg {
-        max-width: 80%;
+        max-width: 82%;
         padding: 0.6rem 0.85rem;
         border-radius: 10px;
         font-size: 0.78rem;
@@ -421,6 +536,10 @@
         font-weight: 700;
         color: var(--text);
       }
+      .msg .warn {
+        font-weight: 700;
+        color: #b45309;
+      }
       .msg .t {
         font-size: 0.62rem;
         color: #aaa;
@@ -434,6 +553,13 @@
         font-size: 0.73rem;
         display: block;
         margin-top: 0.25rem;
+      }
+      .msg .arrears {
+        color: #dc2626;
+        font-weight: 600;
+        font-size: 0.73rem;
+        display: block;
+        margin-top: 0.2rem;
       }
       .typing {
         display: flex;
@@ -487,7 +613,6 @@
         display: block;
       }
       .section-title {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: clamp(1.6rem, 3vw, 2.1rem);
         font-weight: 800;
         letter-spacing: -0.03em;
@@ -501,11 +626,30 @@
         font-weight: 300;
       }
 
+      .payment-methods {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 1.5rem;
+        margin-bottom: 2.75rem;
+      }
+      .pay-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.4rem 0.9rem;
+        background: var(--green-light);
+        border: 1px solid var(--green-mid);
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--green-dark);
+      }
+
       .how-steps {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 1.25rem;
-        margin-top: 2.75rem;
         position: relative;
       }
       .how-steps::before {
@@ -539,13 +683,11 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-weight: 800;
         font-size: 0.9rem;
         margin-bottom: 1.1rem;
       }
       .step-card h3 {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-weight: 700;
         font-size: 0.95rem;
         margin-bottom: 0.5rem;
@@ -579,7 +721,7 @@
         pointer-events: none;
       }
       .commands-inner {
-        max-width: 900px;
+        max-width: 760px;
         margin: 0 auto;
         position: relative;
       }
@@ -596,26 +738,11 @@
         color: rgba(255, 255, 255, 0.45);
       }
 
-      .cmd-categories {
-        display: flex;
-        flex-direction: column;
-        gap: 2.5rem;
-      }
-      .cat-title {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: rgba(255, 255, 255, 0.3);
-        margin-bottom: 0.85rem;
-        padding-bottom: 0.6rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-      }
       .cmd-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
         gap: 0.5rem;
+        margin-bottom: 1rem;
       }
       .cmd-card {
         background: rgba(255, 255, 255, 0.04);
@@ -646,15 +773,17 @@
         color: rgba(255, 255, 255, 0.6);
         line-height: 1.5;
       }
-      .cmd-ex {
-        margin-top: 0.3rem;
-        font-family: ui-monospace, "SF Mono", Menlo, monospace;
-        font-size: 0.71rem;
-        color: rgba(255, 255, 255, 0.28);
-        padding: 0.2rem 0.5rem;
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 5px;
-        display: inline-block;
+      .cmd-more {
+        margin-top: 1.25rem;
+        padding: 0.9rem 1.1rem;
+        background: rgba(0, 165, 80, 0.06);
+        border: 1px solid rgba(0, 165, 80, 0.15);
+        border-radius: 10px;
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.45);
+      }
+      .cmd-more strong {
+        color: var(--green);
       }
       .cmd-note {
         margin-top: 1.75rem;
@@ -717,7 +846,6 @@
         text-transform: uppercase;
         padding: 0.3rem 0.85rem;
         border-radius: 999px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .price-tier {
         font-size: 0.72rem;
@@ -726,10 +854,8 @@
         letter-spacing: 0.08em;
         color: var(--green);
         margin-bottom: 0.75rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .price-amt {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: 2.5rem;
         font-weight: 800;
         letter-spacing: -0.04em;
@@ -744,7 +870,13 @@
       .price-sub {
         font-size: 0.82rem;
         color: var(--muted);
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.4rem;
+      }
+      .price-sub-note {
+        font-size: 0.78rem;
+        color: var(--green-dark);
+        font-weight: 600;
+        margin-bottom: 1.25rem;
       }
       .price-div {
         height: 1px;
@@ -812,7 +944,6 @@
         margin: 0 auto;
       }
       .cta-section h2 {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-size: clamp(1.75rem, 4vw, 2.5rem);
         font-weight: 800;
         color: #fff;
@@ -837,7 +968,6 @@
         font-weight: 700;
         text-decoration: none;
         font-size: 1rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         transition: all 0.15s;
         box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
       }
@@ -857,7 +987,6 @@
         gap: 1rem;
       }
       .footer-brand {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         font-weight: 800;
         font-size: 1rem;
         color: var(--green);
@@ -897,6 +1026,9 @@
         .how-steps::before {
           display: none;
         }
+        .problem-grid {
+          grid-template-columns: 1fr;
+        }
         .cmd-grid {
           grid-template-columns: 1fr;
         }
@@ -906,6 +1038,9 @@
         }
         .footer-links {
           justify-content: center;
+        }
+        .trust-sep {
+          display: none;
         }
       }
 
@@ -926,8 +1061,9 @@
   <body>
     <!-- Nav -->
     <nav>
-      <span class="nav-logo">RentLoop</span>
+      <span class="nav-logo">>RentLoop </span>
       <div class="nav-links">
+        <a href="#problem">Why RentLoop</a>
         <a href="#how">How it works</a>
         <a href="#commands">Commands</a>
         <a href="#pricing">Pricing</a>
@@ -943,13 +1079,22 @@
     <!-- Hero -->
     <section class="hero">
       <div class="hero-badge">
-        <span class="badge-dot"></span>Now live in Kenya — Beta
+        <span class="badge-dot"></span>Live in Kenya Works with your existing
+        Paybill
       </div>
-      <h1>Rent collection on<br /><em>M-Pesa + WhatsApp.</em></h1>
+
+      <h1>Rent tracking, done automatically<br /><em>for your Paybill.</em></h1>
+
+      <div class="hero-kingline">
+        No more checking statements to confirm rent.
+      </div>
+
       <p>
-        The moment a tenant pays, you know. No statements. No spreadsheets. No
-        calls. Just one WhatsApp message — automatically.
+        Tenants keep paying your Paybill as usual. RentLoop links each payment
+        to the right unit, logs it, and sends you a WhatsApp alert instantly
+        everything handled automatically.
       </p>
+
       <div class="hero-actions">
         <a
           href="https://wa.me/254700000000?text=JOIN"
@@ -957,10 +1102,12 @@
           class="btn-hero"
           >Start free on WhatsApp →</a
         >
-        <a href="#how" class="btn-hero-ghost">See how it works</a>
+        <a href="#problem" class="btn-hero-ghost">See how it works</a>
       </div>
+
       <p class="hero-note">
-        Free forever up to 10 units · No app · No spreadsheet
+        Free for up to 3 units · No app to install · Works with your existing
+        Paybill
       </p>
     </section>
 
@@ -969,7 +1116,7 @@
       <div class="stats-inner">
         <div class="stat">
           <div class="stat-number">3s</div>
-          <div class="stat-label">Payment to notification</div>
+          <div class="stat-label">Paybill payment to notification</div>
         </div>
         <div class="stat">
           <div class="stat-number">0</div>
@@ -981,10 +1128,68 @@
         </div>
         <div class="stat">
           <div class="stat-number">100%</div>
-          <div class="stat-label">M-Pesa native</div>
+          <div class="stat-label">Automatic reconciliation</div>
         </div>
       </div>
     </div>
+
+    <!-- Trust strip -->
+    <div class="trust-strip">
+      <div class="trust-inner">
+        <div class="trust-item">
+          ✓ <strong>Works with Safaricom Paybill</strong>
+        </div>
+        <div class="trust-sep"></div>
+        <div class="trust-item">
+          ✓ Built for <strong>Kenyan landlords</strong>
+        </div>
+        <div class="trust-sep"></div>
+        <div class="trust-item">
+          ✓ Used by <strong>property agents &amp; apartment owners</strong>
+        </div>
+        <div class="trust-sep"></div>
+        <div class="trust-item">✓ <strong>No tenant app</strong> required</div>
+      </div>
+    </div>
+
+    <!-- Problem section -->
+    <section id="problem">
+      <div class="problem-section fade-up">
+        <span class="section-label">Why landlords struggle with Paybill</span>
+        <h2 class="section-title">Paybill pays in.<br />But who paid what?</h2>
+        <p class="section-sub">
+          Paybill is powerful. But the bank statement doesn't show you which
+          unit paid. That's where hours disappear every month.
+        </p>
+
+        <div class="problem-grid">
+          <div>
+            <span class="problem-col-label before">Before RentLoop</span>
+            <ul class="problem-list">
+              <li>Tenants send M-Pesa screenshots on WhatsApp</li>
+              <li>Bank statement shows amounts but no unit reference</li>
+              <li>Wrong account references mean payments disappear</li>
+              <li>Hours spent matching payments to units manually</li>
+              <li>Excel sheet updated at end of month if you remember</li>
+              <li>No way to know who's paid until you check the bank</li>
+              <li>Partial payments and arrears tracked in your head</li>
+            </ul>
+          </div>
+          <div>
+            <span class="problem-col-label after">With RentLoop</span>
+            <ul class="solution-list">
+              <li>Payment matched to unit the moment it lands</li>
+              <li>WhatsApp notification within 3 seconds unit, name, amount</li>
+              <li>Mismatched references claimed with one command</li>
+              <li>Zero manual reconciliation ever</li>
+              <li>Ledger updated automatically, every payment</li>
+              <li>Type LIST see exactly who's paid right now</li>
+              <li>Partial payments and arrears tracked automatically</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Demo -->
     <section class="demo-section">
@@ -992,7 +1197,7 @@
         <div class="demo-header">
           <span class="section-label">Live demo</span>
           <h2>What the 1st looks like now</h2>
-          <p>Your WhatsApp on rent day — without lifting a finger</p>
+          <p>Real Paybill payments. Real intelligence. Zero manual work.</p>
         </div>
         <div class="phone-shell">
           <div class="phone-screen">
@@ -1008,27 +1213,44 @@
               <div class="msg-row">
                 <div class="msg-av">RL</div>
                 <div class="msg in">
-                  <b>✓ RentLoop</b><br />John Kamau (Unit 4B) paid
-                  <span class="amt">KES 12,500</span><br />Status: Paid in
-                  full<span class="t">08:02 ✓✓</span>
+                  <b>✓ Sunrise Apartments</b><br />
+                  John Kamau (Unit 4B) paid <span class="amt">KES 12,500</span
+                  ><br />
+                  Status: Paid in full · Rent: KES 12,500
+                  <span class="t">08:02 ✓✓</span>
                 </div>
               </div>
               <div class="msg-row">
                 <div class="msg-av">RL</div>
                 <div class="msg in">
-                  <b>✓ RentLoop</b><br />Mary Wanjiku (Unit 2A) paid
-                  <span class="amt">KES 8,000</span><br />Status: Paid in
-                  full<span class="t">09:15 ✓✓</span>
+                  <b>⚠ Sunrise Apartments</b><br />
+                  Peter Njoroge (Unit E1) paid
+                  <span class="amt">KES 10,000</span><br />
+                  <span class="warn"
+                    >KES 2,000 outstanding partial payment</span
+                  >
+                  <span class="arrears"
+                    >↳ Arrears carried forward: KES 1,500</span
+                  >
+                  <span class="t">09:40 ✓✓</span>
                 </div>
+              </div>
+              <div class="msg-row out">
+                <div class="msg out">LIST<span class="t">18:00 ✓✓</span></div>
               </div>
               <div class="msg-row">
                 <div class="msg-av">RL</div>
                 <div class="msg in">
-                  8 of 12 units paid · <span class="amt">KES 94,500</span
-                  ><br /><span style="color: #888; font-size: 0.72rem"
-                    >Unpaid: Peter Otieno 1C, Grace Auma 3A...</span
-                  ><span class="hint">Reply REMIND to nudge them →</span
-                  ><span class="t">18:00 ✓✓</span>
+                  <b>Sunrise Apartments — March 2026</b><br />
+                  Paid: 8/12 units ·
+                  <span class="amt">KES 94,500 collected</span><br />
+                  <span class="warn"
+                    >KES 21,000 outstanding across 4 units</span
+                  >
+                  <span class="hint"
+                    >Reply REMIND to nudge unpaid tenants →</span
+                  >
+                  <span class="t">18:00 ✓✓</span>
                 </div>
               </div>
               <div class="msg-row out">
@@ -1037,8 +1259,8 @@
               <div class="msg-row">
                 <div class="msg-av">RL</div>
                 <div class="msg in">
-                  Sent reminders to <b>4 unpaid tenants.</b
-                  ><span class="t">18:01 ✓✓</span>
+                  Sent reminders to <b>4 tenants</b> (2 unpaid · 2
+                  partial).<span class="t">18:01 ✓✓</span>
                 </div>
               </div>
               <div class="msg-row">
@@ -1058,39 +1280,48 @@
     <!-- How it works -->
     <section id="how">
       <div class="how-section fade-up">
-        <div style="max-width: 480px">
+        <div style="max-width: 520px">
           <span class="section-label">How it works</span>
-          <h2 class="section-title">No app. No login.<br />Just WhatsApp.</h2>
+          <h2 class="section-title">Uses the Paybill<br />you already have.</h2>
           <p class="section-sub">
-            Everything runs through the messaging app you already have open all
-            day.
+            No tenant app. No change in how they pay. RentLoop works in the
+            background — automatic Paybill reconciliation, instant WhatsApp
+            alerts.
           </p>
+          <div class="payment-methods">
+            <span class="pay-pill">✓ M-Pesa on phone</span>
+            <span class="pay-pill">✓ M-Pesa agent shop</span>
+            <span class="pay-pill">✓ Bank counter</span>
+            <span class="pay-pill">✓ ATM deposit</span>
+          </div>
         </div>
         <div class="how-steps">
           <div class="step-card">
             <div class="step-num">1</div>
-            <h3>Tenant pays M-Pesa</h3>
+            <h3>Tenant pays your Paybill</h3>
             <p>
               Tenant sends rent to your existing Paybill using their unit
               reference (e.g. <strong>4B</strong>) as the account number.
-              Nothing changes for them.
+              Nothing changes for them M-Pesa, agent, bank, or ATM.
             </p>
           </div>
           <div class="step-card">
             <div class="step-num">2</div>
-            <h3>Both get notified instantly</h3>
+            <h3>RentLoop reconciles instantly</h3>
             <p>
-              Within 3 seconds you receive a WhatsApp notification. The tenant
-              gets an SMS receipt. Automatic. Every payment.
+              RentLoop matches the payment to the unit, records the amount,
+              flags partial payments and arrears, and updates the ledger — all
+              within 3 seconds.
             </p>
           </div>
           <div class="step-card">
             <div class="step-num">3</div>
-            <h3>Manage from WhatsApp</h3>
+            <h3>You manage from WhatsApp</h3>
             <p>
-              Type <strong>LIST</strong> to see who has paid. Type
-              <strong>REMIND</strong> to nudge everyone who hasn't. No login. No
-              URL.
+              You get notified instantly. Type <strong>LIST</strong> to see
+              who's paid. Type <strong>REMIND</strong> to nudge everyone who
+              hasn't. Type <strong>TOTAL</strong> for the full picture. No
+              login. No URL.
             </p>
           </div>
         </div>
@@ -1104,248 +1335,71 @@
           <span class="section-label">WhatsApp commands</span>
           <h2 class="section-title">Everything from one message</h2>
           <p class="section-sub">
-            Send any command in capitals to your RentLoop WhatsApp number. No
-            login. No URL. No app.
+            Send any command in capitals to your RentLoop number. No login. No
+            URL. No app. Works with automatic Paybill reconciliation in the
+            background.
           </p>
         </div>
 
-        <div class="cmd-categories">
-          <div>
-            <div class="cat-title">
-              Daily use — these are the only three you need every month
-            </div>
-            <div class="cmd-grid">
-              <div class="cmd-card">
-                <span class="cmd-code">LIST</span>
-                <div>
-                  <div class="cmd-desc">
-                    See all units — who has paid, who hasn't, and any partial
-                    balances — for the current month
-                  </div>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">REMIND</span>
-                <div>
-                  <div class="cmd-desc">
-                    Send a WhatsApp reminder to every tenant who hasn't paid
-                    this month. One word, done.
-                  </div>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">TOTAL</span>
-                <div>
-                  <div class="cmd-desc">
-                    Total collected vs total expected this month, with the
-                    outstanding balance
-                  </div>
-                </div>
-              </div>
+        <div class="cmd-grid">
+          <div class="cmd-card">
+            <span class="cmd-code">LIST</span>
+            <div class="cmd-desc">
+              All units — paid, unpaid, and partial balances for the current
+              month. Updated in real time as payments land.
             </div>
           </div>
-
-          <div>
-            <div class="cat-title">Payment lookup</div>
-            <div class="cmd-grid">
-              <div class="cmd-card">
-                <span class="cmd-code">RECEIPT 4B</span>
-                <div>
-                  <div class="cmd-desc">
-                    Resend the payment receipt for a specific unit this month
-                  </div>
-                  <span class="cmd-ex">RECEIPT A1</span>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">HISTORY 4B</span>
-                <div>
-                  <div class="cmd-desc">
-                    Last 3 months of payment records for any unit — amounts and
-                    statuses
-                  </div>
-                  <span class="cmd-ex">HISTORY B1</span>
-                </div>
-              </div>
+          <div class="cmd-card">
+            <span class="cmd-code">REMIND</span>
+            <div class="cmd-desc">
+              Send a WhatsApp reminder to every unpaid and partially-paid
+              tenant. Partial payers see exactly what they still owe.
             </div>
           </div>
-
-          <div>
-            <div class="cat-title">Unit management</div>
-            <div class="cmd-grid">
-              <div class="cmd-card">
-                <span class="cmd-code">ADD UNIT</span>
-                <div>
-                  <div class="cmd-desc">
-                    Add a new unit with tenant name, phone number, and monthly
-                    rent
-                  </div>
-                  <span class="cmd-ex"
-                    >ADD UNIT 4B John Kamau 0712345678 12500</span
-                  >
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">REPLACE</span>
-                <div>
-                  <div class="cmd-desc">
-                    Swap the tenant on a unit. All previous payment history is
-                    preserved under the unit.
-                  </div>
-                  <span class="cmd-ex"
-                    >REPLACE 4B Grace Auma 0745678901 12500</span
-                  >
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">SET RENT</span>
-                <div>
-                  <div class="cmd-desc">
-                    Update the expected monthly rent for a unit. Takes effect
-                    immediately for new payments.
-                  </div>
-                  <span class="cmd-ex">SET RENT 4B 14000</span>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">BULK ADD</span>
-                <div>
-                  <div class="cmd-desc">
-                    Get the CSV template to upload all your tenants at once. Up
-                    to 50 units in one file.
-                  </div>
-                </div>
-              </div>
+          <div class="cmd-card">
+            <span class="cmd-code">TOTAL</span>
+            <div class="cmd-desc">
+              Total collected vs expected this month, with outstanding balance
+              and security deposits shown separately.
             </div>
           </div>
-
-          <div>
-            <div class="cat-title">Payment handling</div>
-            <div class="cmd-grid">
-              <div class="cmd-card">
-                <span class="cmd-code">MARK … PAID</span>
-                <div>
-                  <div class="cmd-desc">
-                    Log a cash or bank payment manually. Recorded in the same
-                    ledger as M-Pesa payments.
-                  </div>
-                  <span class="cmd-ex">MARK 4B PAID 12500 CASH</span>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">CLAIM … TO</span>
-                <div>
-                  <div class="cmd-desc">
-                    Assign an unmatched payment to the correct unit when a
-                    tenant used the wrong reference
-                  </div>
-                  <span class="cmd-ex">CLAIM LHG31AA5TX TO 4B</span>
-                </div>
-              </div>
+          <div class="cmd-card">
+            <span class="cmd-code">HISTORY E1</span>
+            <div class="cmd-desc">
+              Last 3 months for any unit: amounts, statuses, arrears carried
+              forward. Full 12-month view also available.
             </div>
           </div>
-
-          <div>
-            <div class="cat-title">
-              Agent commands — manage multiple landlords from one WhatsApp
-              number
-            </div>
-            <div class="cmd-grid">
-              <div class="cmd-card">
-                <span class="cmd-code">CLIENTS</span>
-                <div>
-                  <div class="cmd-desc">
-                    List all landlords in your portfolio with unit counts and
-                    subscription status
-                  </div>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">LIST Wanjiku</span>
-                <div>
-                  <div class="cmd-desc">
-                    Paid vs unpaid summary for a specific landlord you manage.
-                    Use any part of their name.
-                  </div>
-                  <span class="cmd-ex">LIST Kariuki</span>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">REMIND Wanjiku</span>
-                <div>
-                  <div class="cmd-desc">
-                    Send payment reminders to all unpaid tenants under a
-                    specific landlord
-                  </div>
-                  <span class="cmd-ex">REMIND Kariuki</span>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">TOTAL ALL</span>
-                <div>
-                  <div class="cmd-desc">
-                    Combined collected vs expected across your entire portfolio
-                    of landlords this month
-                  </div>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">TOTAL Wanjiku</span>
-                <div>
-                  <div class="cmd-desc">
-                    Collected vs expected for one specific landlord this month
-                  </div>
-                  <span class="cmd-ex">TOTAL Kariuki</span>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">RECEIPT Wanjiku 4B</span>
-                <div>
-                  <div class="cmd-desc">
-                    Get the payment receipt for a specific unit under a specific
-                    landlord
-                  </div>
-                  <span class="cmd-ex">RECEIPT Kariuki A1</span>
-                </div>
-              </div>
+          <div class="cmd-card">
+            <span class="cmd-code">CLAIM … TO</span>
+            <div class="cmd-desc">
+              Assign an unmatched Paybill payment to the correct unit. Handles
+              wrong account references automatically.
             </div>
           </div>
-
-          <div>
-            <div class="cat-title">Getting started</div>
-            <div class="cmd-grid">
-              <div class="cmd-card">
-                <span class="cmd-code">JOIN</span>
-                <div>
-                  <div class="cmd-desc">
-                    Register as a new landlord and get your CSV onboarding
-                    template
-                  </div>
-                </div>
-              </div>
-              <div class="cmd-card">
-                <span class="cmd-code">HELP</span>
-                <div>
-                  <div class="cmd-desc">
-                    Get the full command list sent back to your WhatsApp any
-                    time
-                  </div>
-                </div>
-              </div>
+          <div class="cmd-card">
+            <span class="cmd-code">MARK … PAID</span>
+            <div class="cmd-desc">
+              Log a cash or bank payment manually. Recorded in the same ledger
+              as automatic Paybill payments.
             </div>
           </div>
         </div>
 
+        <div class="cmd-more">
+          <strong>15+ commands available after you join</strong> — including ADD
+          UNIT, REPLACE tenant, SET RENT, DEPOSIT tracking, BULK CSV upload,
+          agent portfolio view (CLIENTS, TOTAL ALL, REMIND ALL), and full
+          12-month landlord history.
+        </div>
+
         <div class="cmd-note">
-          <strong>How commands work:</strong> All commands are typed in
-          CAPITALS. Unit references match exactly what your tenant types when
-          paying via M-Pesa if their unit is <strong>4B</strong>, they pay
-          account <strong>4B</strong> and you type <strong>RECEIPT 4B</strong>.
-          Variations like <em>4b</em>, <em>unit 4B</em>, and
-          <em>UNIT-4B</em> all resolve to the same unit automatically. For agent
-          commands, you can use any part of the landlord's name —
-          <strong>LIST Wanjiku</strong> will find
-          <em>Sarah Wanjiku Properties</em>.
+          <strong>How Paybill matching works:</strong> When a tenant pays your
+          Paybill, they use their unit number as the account reference. RentLoop
+          matches that reference to the unit automatically — <em>4b</em>,
+          <em>unit 4B</em>, and <em>UNIT-4B</em> all resolve to the same unit.
+          If a tenant uses the wrong reference, type
+          <strong>CLAIM TXN-ABC123 TO 4B</strong> to assign it in one message.
         </div>
       </div>
     </section>
@@ -1357,43 +1411,49 @@
           <span class="section-label">Pricing</span>
           <h2 class="section-title">Simple and fair</h2>
           <p class="section-sub">
-            Start free. Pay only when you grow past 10 units. No contracts, no
-            setup fees.
+            All features included. You only pay for number of units. No
+            contracts, no setup fees, no Paybill changes required.
           </p>
         </div>
         <div class="pricing-grid">
           <div class="price-card">
-            <div class="price-tier">Manual</div>
+            <div class="price-tier">Starter</div>
             <div class="price-amt">Free</div>
             <div class="price-sub">Up to 3 units · Forever</div>
+            <div class="price-sub-note">Full reconciliation included</div>
             <div class="price-div"></div>
             <ul class="price-features">
+              <li>Automatic Paybill reconciliation</li>
               <li>Real-time WhatsApp notifications</li>
               <li>Tenant SMS receipts</li>
-              <li>6 PM daily digest</li>
+              <li>Arrears and partial payment tracking</li>
               <li>Payment history and receipts</li>
+              <li>6 PM daily digest</li>
             </ul>
           </div>
           <div class="price-card featured">
             <div class="feat-badge">Most popular</div>
-            <div class="price-tier">Automated</div>
+            <div class="price-tier">Growth</div>
             <div class="price-amt">KES 50 <span>/unit/mo</span></div>
             <div class="price-sub">4+ units · No cap</div>
+            <div class="price-sub-note">All features · Unlimited units</div>
             <div class="price-div"></div>
             <ul class="price-features">
-              <li>Everything in Automated</li>
+              <li>Everything in Starter</li>
               <li>Unlimited units</li>
               <li>Agent portfolio view</li>
               <li>Multi-landlord management</li>
               <li>Bulk CSV tenant onboarding</li>
+              <li>Security deposit tracking</li>
+              <li>12-month portfolio history</li>
             </ul>
           </div>
         </div>
         <p class="pricing-note">
-          <strong>20 units = KES 1,000/month</strong> less than the cost of one
-          hour of manual reconciliation.<br />
+          <strong>20 units = KES 1,000/month</strong> — less than the cost of
+          one hour of manual reconciliation.<br />
           Agent managing 60 units across 3 landlords = KES 3,000/month and ~30
-          hours saved every month.
+          hours saved every single month.
         </p>
       </div>
     </section>
@@ -1401,24 +1461,30 @@
     <!-- CTA -->
     <section class="cta-section">
       <div class="cta-inner">
-        <h2>Ready for a better 1st?</h2>
+        <h2>Stop reconciling rent manually.</h2>
         <p>
-          Send JOIN on WhatsApp. Takes 30 seconds. Free to start. No app needed.
+          Let RentLoop do it automatically from your Paybill. Send JOIN on
+          WhatsApp. Takes 30 seconds. Free to start.
         </p>
         <a
           href="https://wa.me/254700000000?text=JOIN"
           target="_blank"
           class="btn-white"
-          >Send JOIN on WhatsApp →</a
         >
+          Send JOIN on WhatsApp →
+        </a>
       </div>
     </section>
 
     <!-- Footer -->
     <footer>
       <span class="footer-brand">RentLoop</span>
-      <span class="footer-text">Built in Kenya, for Kenya · © {{.Year}}</span>
+      <span class="footer-text"
+        >© <span id="current-year"></span> RentLoop Kenya. All rights
+        reserved.</span
+      >
       <div class="footer-links">
+        <a href="#problem">Why RentLoop</a>
         <a href="#how">How it works</a>
         <a href="#commands">Commands</a>
         <a href="#pricing">Pricing</a>
@@ -1427,6 +1493,10 @@
     </footer>
 
     <script>
+      // 1. Update the copyright year in the footer
+      document.getElementById("current-year").textContent =
+        new Date().getFullYear();
+
       const io = new IntersectionObserver(
         (entries) => {
           entries.forEach((el) => {

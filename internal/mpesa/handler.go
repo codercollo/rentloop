@@ -40,7 +40,7 @@ type Handler struct {
 	ledger    LedgerService
 	notifier  NotifierService
 	landlords LandlordRepository
-	billing   *billing.Handler // nil-safe: routes RENTLOOP- refs to billing service
+	billing   *billing.Handler
 	isDev     bool
 }
 
@@ -64,11 +64,6 @@ func NewHandler(
 }
 
 // Callback handles POST /mpesa/c2b/callback.
-//
-// Design constraints:
-//   - Must return HTTP 200 within 5 seconds or Safaricom retries.
-//   - All processing is async — response is sent before work starts.
-//   - transaction_id UNIQUE constraint guards against duplicate callbacks.
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	if err := ValidateIP(r, h.isDev); err != nil {
 		slog.Warn("mpesa callback: blocked IP", "error", err, "remote", r.RemoteAddr)
@@ -89,29 +84,35 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	source := DetectPaymentSource(cb)
+
 	slog.Info("mpesa callback: received",
 		"trans_id", cb.TransID,
 		"amount", cb.TransAmount,
 		"ref", cb.BillRefNumber,
 		"msisdn", cb.MSISDN,
+		"source", source,
+		"third_party_id", cb.ThirdPartyTransID,
 	)
 
 	writeJSON(w, http.StatusOK, successResponse)
-	go h.process(cb)
+	go h.process(cb, source)
 }
 
 // process runs the full pipeline after the HTTP response is sent.
-func (h *Handler) process(cb C2BCallback) {
+func (h *Handler) process(cb C2BCallback, source models.PaymentSource) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	log := slog.With("trans_id", cb.TransID, "ref", cb.BillRefNumber)
+	log := slog.With(
+		"trans_id", cb.TransID,
+		"ref", cb.BillRefNumber,
+		"source", source,
+	)
 
-	// ── Subscription payment — route to billing, skip rent ledger ─────────────
-	// RENTLOOP-{id} refs are landlord subscription payments.
-	// They must never enter the rent ledger.
+	// ── Subscription payment ──────────────────────────────────────────────────
 	if billing.IsSubscriptionPayment(cb.BillRefNumber) {
-		log.Info("process: subscription payment", "ref", cb.BillRefNumber)
+		log.Info("process: subscription payment")
 		amount, err := ParseAmount(cb.TransAmount)
 		if err != nil {
 			log.Error("process: subscription parse amount failed", "error", err)
@@ -123,18 +124,29 @@ func (h *Handler) process(cb C2BCallback) {
 		return
 	}
 
-	// ── Resolve landlord from paybill ─────────────────────────────────────────
+	// ── Resolve landlord ──────────────────────────────────────────────────────
 	landlord, err := h.landlords.GetByPaybill(ctx, cb.BusinessShortCode)
 	if err != nil {
-		log.Error("process: landlord not found", "paybill", cb.BusinessShortCode, "error", err)
+		log.Error("process: landlord not found",
+			"paybill", cb.BusinessShortCode, "error", err)
 		return
 	}
 
-	// ── Match account reference to a unit ─────────────────────────────────────
+	// FIX 4: use premise_name (fully-qualified) for notifications, falling
+	// back to apartment_name. Previously landlord.ApartmentName was passed
+	// directly, which gave "Sunrise Apartments" instead of
+	// "Sunrise Apartments - Kitengela" — inconsistent with all bot responses.
+	notifyName := landlord.PremiseName
+	if notifyName == "" {
+		notifyName = landlord.ApartmentName
+	}
+
+	// ── Match account reference to a unit ────────────────────────────────────
 	unit, err := h.matcher.Match(ctx, landlord.ID, cb.BillRefNumber)
 	if err != nil {
-		log.Warn("process: no matching unit", "landlord_id", landlord.ID, "error", err)
-		h.handleUnmatched(ctx, cb, landlord)
+		log.Warn("process: no matching unit",
+			"landlord_id", landlord.ID, "error", err)
+		h.handleUnmatched(ctx, cb, landlord, notifyName, source)
 		return
 	}
 
@@ -154,6 +166,7 @@ func (h *Handler) process(cb C2BCallback) {
 		Amount:        amount,
 		MonthKey:      monthKey(cb.TransTime),
 		PaidAt:        time.Now(),
+		PaymentSource: source,
 	}
 
 	recorded, err := h.ledger.Record(ctx, payment)
@@ -163,7 +176,7 @@ func (h *Handler) process(cb C2BCallback) {
 	}
 
 	if recorded == nil {
-		log.Info("process: duplicate transaction skipped", "trans_id", cb.TransID)
+		log.Info("process: duplicate transaction skipped")
 		return
 	}
 
@@ -172,19 +185,30 @@ func (h *Handler) process(cb C2BCallback) {
 		"unit", unit.UnitRef,
 		"amount", recorded.Amount,
 		"status", recorded.Status,
+		"source", recorded.PaymentSource,
 	)
 
 	// ── Notify landlord + tenant ──────────────────────────────────────────────
-	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, unit, landlord.ApartmentName); err != nil {
+	// FIX 4: pass notifyName (premise_name with fallback) to both calls.
+	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, unit, notifyName); err != nil {
 		log.Error("process: landlord notification failed", "error", err)
 	}
-	if err := h.notifier.NotifyTenant(ctx, cb.MSISDN, recorded, unit, landlord.ApartmentName); err != nil {
-		log.Error("process: tenant receipt failed", "error", err)
+
+	if cb.MSISDN != "" && source != models.PaymentSourceBankPaybill {
+		if err := h.notifier.NotifyTenant(ctx, cb.MSISDN, recorded, unit, notifyName); err != nil {
+			log.Error("process: tenant receipt failed", "error", err)
+		}
 	}
 }
 
 // handleUnmatched records an unrecognised payment and alerts the landlord.
-func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord *models.Landlord) {
+func (h *Handler) handleUnmatched(
+	ctx context.Context,
+	cb C2BCallback,
+	landlord *models.Landlord,
+	notifyName string,
+	source models.PaymentSource,
+) {
 	log := slog.With("trans_id", cb.TransID, "ref", cb.BillRefNumber)
 
 	amount, err := ParseAmount(cb.TransAmount)
@@ -199,7 +223,8 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 		TenantPhone:   cb.MSISDN,
 		Amount:        amount,
 		MonthKey:      monthKey(cb.TransTime),
-		Status:        "unmatched",
+		Status:        models.PaymentStatusUnknown,
+		PaymentSource: source,
 		PaidAt:        time.Now(),
 	})
 	if err != nil {
@@ -210,9 +235,13 @@ func (h *Handler) handleUnmatched(ctx context.Context, cb C2BCallback, landlord 
 		return
 	}
 
-	log.Warn("handleUnmatched: recorded", "payment_id", recorded.ID)
+	log.Warn("handleUnmatched: recorded",
+		"payment_id", recorded.ID,
+		"source", source,
+	)
 
-	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, nil, landlord.ApartmentName); err != nil {
+	// FIX 4: use notifyName here too.
+	if err := h.notifier.NotifyLandlord(ctx, landlord.WhatsAppPhone, recorded, nil, notifyName); err != nil {
 		log.Error("handleUnmatched: notify failed", "error", err)
 	}
 }
@@ -225,7 +254,6 @@ func monthKey(transTime string) string {
 	return transTime[:4] + "-" + transTime[4:6]
 }
 
-// writeJSON encodes v as JSON with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

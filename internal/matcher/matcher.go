@@ -57,9 +57,16 @@ func (m *Matcher) Match(ctx context.Context, landlordID, rawRef string) (*models
 // storing and comparing unit refs
 func Normalise(raw string) string {
 	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+
 	s = strings.ToUpper(s)
 
-	for _, prefix := range []string{"APARTMENT", "UNIT", "ROOM", "HOUSE", "APT"} {
+	// Strip known word prefixes — longest first to avoid partial matches.
+	for _, prefix := range []string{
+		"APARTMENT", "FLAT", "HOUSE", "ROOM", "PLOT", "UNIT", "APT",
+	} {
 		if strings.HasPrefix(s, prefix) {
 			s = strings.TrimPrefix(s, prefix)
 			s = strings.TrimSpace(s)
@@ -67,13 +74,45 @@ func Normalise(raw string) string {
 		}
 	}
 
-	// Remove internal whitespace, dashes, underscores
+	// Remove separators: spaces, dashes, underscores, slashes, dots.
 	s = strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) || r == '-' || r == '_' {
+		if unicode.IsSpace(r) || r == '-' || r == '_' || r == '/' || r == '.' {
 			return -1
 		}
 		return r
 	}, s)
 
+	// Strip leading zeros from a purely numeric prefix.
+	s = stripLeadingZeros(s)
+
 	return s
+}
+
+// stripLeadingZeros removes leading zeros from a numeric prefix of s.
+func stripLeadingZeros(s string) string {
+	if s == "" {
+		return s
+	}
+
+	// Find the leading run of digits.
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+
+	// No leading digits — nothing to strip.
+	if i == 0 {
+		return s
+	}
+
+	numPart := s[:i]
+	tail := s[i:]
+
+	// Trim leading zeros from the numeric part, but keep at least one digit.
+	numPart = strings.TrimLeft(numPart, "0")
+	if numPart == "" {
+		numPart = "0"
+	}
+
+	return numPart + tail
 }

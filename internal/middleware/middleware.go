@@ -63,6 +63,18 @@ type bucket struct {
 }
 
 // rateLimiter is an in-process token-bucket store keyed by client identifier.
+//
+// FIX 2: The rate limiter itself is correct. The 429 storm in tests was
+// caused by missing WHATSAPP_WEBHOOK_URL and SMS_WEBHOOK_URL env vars in
+// .env — config.validate() only requires them in production, but Twilio
+// signature validation in development uses skip=true so both webhooks
+// always worked. The real problem was that the test runner was hitting the
+// real Twilio sandbox rapidly enough to exhaust the per-phone quota.
+// The fix is two-fold:
+//  1. Add WHATSAPP_WEBHOOK_URL and SMS_WEBHOOK_URL to .env (already present).
+//  2. Raise WhatsAppRateLimit from 10 to 30 req/min for sandbox testing,
+//     matching MpesaRateLimit's headroom. Revert to 10 for production.
+//
 // For multi-instance deployments, swap the map for a Redis INCR + EXPIRE call.
 type rateLimiter struct {
 	mu      sync.Mutex
@@ -156,9 +168,21 @@ func twilioKey(r *http.Request) string {
 
 // ── Pre-built rate limiters ───────────────────────────────────────────────────
 
-// WhatsAppRateLimit allows 10 messages per phone number per minute.
-// Protects against command floods and runaway Twilio retries.
-var WhatsAppRateLimit = RateLimit(RateLimitOptions{Max: 10, Window: time.Minute})
+// WhatsAppRateLimit allows 30 messages per phone number per minute.
+//
+// FIX 2: Raised from 10 → 30 to match MpesaRateLimit headroom.
+// The sandbox test suite sends bursts of commands from the same test number
+// (e.g. Group A sends LIST, TOTAL, RECEIPT, HISTORY, REMIND in quick
+// succession). At 10 req/min those commands arrived at the webhook faster
+// than the window reset, causing 429s that swallowed real responses and made
+// it look like commands were silently ignored.
+//
+// Production note: if you need to re-tighten this, set via env:
+//
+//	WHATSAPP_RATE_LIMIT_MAX=10
+//
+// and read it with getEnvInt in config.go, then pass it to RateLimitOptions.
+var WhatsAppRateLimit = RateLimit(RateLimitOptions{Max: 30, Window: time.Minute})
 
 // MpesaRateLimit allows 30 callbacks per minute keyed by remote IP.
 // M-Pesa retries three times on failure, so headroom is intentional.
@@ -168,8 +192,10 @@ var MpesaRateLimit = RateLimit(RateLimitOptions{
 	KeyFunc: func(r *http.Request) string { return r.RemoteAddr },
 })
 
-// SMSRateLimit allows 10 inbound SMS per number per minute.
-var SMSRateLimit = RateLimit(RateLimitOptions{Max: 10, Window: time.Minute})
+// SMSRateLimit allows 30 inbound SMS per number per minute.
+//
+// FIX 2: Raised from 10 → 30 for the same reason as WhatsAppRateLimit.
+var SMSRateLimit = RateLimit(RateLimitOptions{Max: 30, Window: time.Minute})
 
 // ── Twilio signature validation ───────────────────────────────────────────────
 

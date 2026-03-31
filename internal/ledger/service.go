@@ -35,32 +35,50 @@ func NewService(repo PaymentRepository) *Service {
 
 // Record persists a payment and derives its status.
 //
-// Status rules:
+// Status rules (applied to the running monthly total, not just this payment):
 //   - unmatched  — UnitID is empty (no unit found for the account ref)
-//   - paid       — running monthly total >= expected_rent
-//   - partial    — running monthly total > 0 but < expected_rent
 //   - overpaid   — running monthly total >= 2 × expected_rent
+//   - paid       — running monthly total >= expected_rent (and < 2x)
+//   - partial    — running monthly total > 0 but < expected_rent
+//
+// The 2× threshold for "overpaid" matches the threshold used in cmdMark and
+// AssignPaymentToUnit so that all payment paths classify consistently.
+// A single payment of exactly expected_rent (e.g. KES 15,000 on a 15,000
+// unit) correctly resolves to "paid", not "overpaid".
+//
+// Snapshot fields populated automatically:
+//   - ExpectedRentSnapshot — set from units.expected_rent at call time
+//   - ArrearsCarried       — caller is responsible (mpesa.Handler passes 0;
+//     a future arrears job will back-fill)
 //
 // Idempotency: when transaction_id already exists (models.ErrDuplicate),
-// Record returns (nil, nil). The caller treats this as a silent no-op.
-// Daraja may fire the same callback more than once — we discard duplicates
-// at the database level via the UNIQUE constraint.
+// Record returns (nil, nil). Daraja may fire the same callback more than
+// once — we discard duplicates at the DB level via the UNIQUE constraint.
 func (s *Service) Record(ctx context.Context, p models.Payment) (*models.Payment, error) {
 	if p.PaidAt.IsZero() {
 		p.PaidAt = time.Now()
 	}
 
+	// Default source to STK if not set by the caller.
+	if p.PaymentSource == "" {
+		p.PaymentSource = models.PaymentSourceMpesaSTK
+	}
+
 	// Unmatched — no unit found. Store with no unit, status unmatched.
 	if p.UnitID == "" {
-		p.Status = "unmatched"
+		p.Status = models.PaymentStatusUnmatched
+		p.ExpectedRentSnapshot = 0
 		return s.insert(ctx, p)
 	}
 
-	// Fetch the unit to read expected_rent.
+	// Fetch the unit to read expected_rent at this point in time.
 	unit, err := s.repo.GetUnit(ctx, p.UnitID)
 	if err != nil {
 		return nil, fmt.Errorf("record: get unit: %w", err)
 	}
+
+	// Snapshot the rent so history queries are stable after SET RENT.
+	p.ExpectedRentSnapshot = unit.ExpectedRent
 
 	// Sum all payments already recorded for this unit this month.
 	existing, err := s.repo.GetMonthlyTotal(ctx, p.UnitID, p.MonthKey)
@@ -84,6 +102,7 @@ func (s *Service) Record(ctx context.Context, p models.Payment) (*models.Payment
 			"expected", unit.ExpectedRent,
 			"monthly_total", newTotal,
 			"status", recorded.Status,
+			"source", recorded.PaymentSource,
 		)
 	}
 
@@ -107,10 +126,19 @@ func (s *Service) insert(ctx context.Context, p models.Payment) (*models.Payment
 }
 
 // deriveStatus determines payment status from the running monthly total
-// vs the expected rent amount.
+// vs the expected rent.
+//
+// Thresholds (consistent with cmdMark and AssignPaymentToUnit):
+//   - total >= 2 × expected → overpaid  (↑)
+//   - total >= expected     → paid      (✓)
+//   - total < expected      → partial   (⚠)
+//
+// Edge cases:
+//   - expected == 0: any positive payment is considered paid
+//   - total == 0: should not reach here (unmatched path handles UnitID == "")
 func deriveStatus(total, expected int) models.PaymentStatus {
 	switch {
-	case total >= expected*2:
+	case expected > 0 && total >= expected*2:
 		return models.PaymentStatusOver
 	case total >= expected:
 		return models.PaymentStatusPaid
