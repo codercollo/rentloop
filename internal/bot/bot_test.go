@@ -115,7 +115,14 @@ func (m *mockRepo) InsertManualPayment(_ context.Context, p models.Payment) (*mo
 }
 
 func (m *mockRepo) GetPaymentHistory12(_ context.Context, _ string) ([]models.MonthlyPaymentRow, error) {
-	return nil, nil
+	return []models.MonthlyPaymentRow{
+		{
+			MonthKey:             time.Now().Format("2006-01"),
+			AmountPaid:           12500,
+			ExpectedRentSnapshot: 12500,
+			Status:               models.PaymentStatusPaid,
+		},
+	}, nil
 }
 
 func (m *mockRepo) GetPortfolioHistory12(_ context.Context, _ string) ([]models.PortfolioMonthRow, error) {

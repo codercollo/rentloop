@@ -136,7 +136,7 @@ func TestTwilio_SendReminder_FormatsCorrectly(t *testing.T) {
 	if !strings.Contains(gotBody, "John Kamau") {
 		t.Errorf("expected tenant name in reminder, got: %s", gotBody)
 	}
-	if !strings.Contains(gotBody, "12500") {
+	if !strings.Contains(gotBody, "12,500") { // formatAmount produces comma-separated output
 		t.Errorf("expected amount in reminder, got: %s", gotBody)
 	}
 }
