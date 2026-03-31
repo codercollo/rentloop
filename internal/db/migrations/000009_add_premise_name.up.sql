@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE landlords
+    ADD COLUMN IF NOT EXISTS premise_name TEXT NOT NULL DEFAULT '';
+
+COMMIT;

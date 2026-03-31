@@ -1,5 +1,5 @@
-// Package bot_test contains black-box unit tests for the bot service.
-// All tests use mocks — no database or HTTP calls required.
+// // Package bot_test contains black-box unit tests for the bot service.
+// // All tests use mocks — no database or HTTP calls required.
 package bot_test
 
 import (
@@ -73,7 +73,15 @@ func (m *mockRepo) GetUnmatchedPayment(_ context.Context, _, _ string) (*models.
 	}, nil
 }
 
-func (m *mockRepo) AssignPaymentToUnit(_ context.Context, _, _ string) error { return nil }
+func (m *mockRepo) AssignPaymentToUnit(
+	_ context.Context,
+	_ string,
+	_ string,
+	_ int,
+	_ int,
+) error {
+	return nil
+}
 
 func (m *mockRepo) InsertUnit(_ context.Context, u models.Unit) (*models.Unit, error) {
 	u.ID = "u-new"
@@ -91,6 +99,11 @@ func (m *mockRepo) UpdateExpectedRent(_ context.Context, _, _ string, _ int) err
 	return nil
 }
 
+func (m *mockRepo) UpdateUnitCount(ctx context.Context, landlordID string, count int) error {
+	// For testing, just store the count if you want, or do nothing
+	return nil
+}
+
 func (m *mockRepo) ReplaceUnitTenant(_ context.Context, _ string, u models.Unit) (*models.Unit, error) {
 	u.ID = "u-replaced"
 	return &u, nil
@@ -99,6 +112,21 @@ func (m *mockRepo) ReplaceUnitTenant(_ context.Context, _ string, u models.Unit)
 func (m *mockRepo) InsertManualPayment(_ context.Context, p models.Payment) (*models.Payment, error) {
 	p.ID = "pay-manual"
 	return &p, nil
+}
+
+func (m *mockRepo) GetPaymentHistory12(_ context.Context, _ string) ([]models.MonthlyPaymentRow, error) {
+	return []models.MonthlyPaymentRow{
+		{
+			MonthKey:             time.Now().Format("2006-01"),
+			AmountPaid:           12500,
+			ExpectedRentSnapshot: 12500,
+			Status:               models.PaymentStatusPaid,
+		},
+	}, nil
+}
+
+func (m *mockRepo) GetPortfolioHistory12(_ context.Context, _ string) ([]models.PortfolioMonthRow, error) {
+	return nil, nil
 }
 
 // ── Mock sender ───────────────────────────────────────────────────────────────
@@ -119,7 +147,7 @@ type mockSMS struct {
 	onboarding int
 }
 
-func (m *mockSMS) SendReminder(_ context.Context, _, _, _ string, _ int, _ string) error {
+func (m *mockSMS) SendReminder(_ context.Context, _, _, _ string, _, _ int, _ string) error {
 	m.reminders++
 	return nil
 }

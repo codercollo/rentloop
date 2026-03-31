@@ -22,6 +22,7 @@ import (
 	"github.com/codercollo/rentloop/internal/bot"
 	"github.com/codercollo/rentloop/internal/config"
 	"github.com/codercollo/rentloop/internal/db"
+	deposits "github.com/codercollo/rentloop/internal/deposit"
 	"github.com/codercollo/rentloop/internal/ledger"
 	"github.com/codercollo/rentloop/internal/matcher"
 	appMiddleware "github.com/codercollo/rentloop/internal/middleware"
@@ -52,14 +53,17 @@ func main() {
 	tmpl := template.Must(template.ParseGlob("web/templates/*.html"))
 
 	// ── Repositories ──────────────────────────────────────────────────────────
-	// ledgerRepo satisfies ledger.PaymentRepository, matcher.Repository,
-	// and mpesa.LandlordRepository — one struct, three interfaces.
 	ledgerRepo := ledger.NewRepository(pool)
 	botRepo := bot.NewRepository(pool)
+	depositRepo := deposits.NewRepository(pool)
 
 	// ── Core services ─────────────────────────────────────────────────────────
 	ledgerSvc := ledger.NewService(ledgerRepo)
 	matcherSvc := matcher.New(ledgerRepo)
+
+	// ── Deposit service ────────────────────────────────────────────────────────
+	// ledgerRepo satisfies deposits.UnitFetcher via GetUnitByRef.
+	depositSvc := deposits.NewService(depositRepo, ledgerRepo)
 
 	// ── Twilio — WhatsApp + SMS ───────────────────────────────────────────────
 	tw := notifier.NewTwilio(
@@ -70,9 +74,8 @@ func main() {
 	)
 
 	// ── Bot ───────────────────────────────────────────────────────────────────
-	// waSender  → bot replies via Twilio WhatsApp
-	// smsSender → onboarding welcome messages via Twilio SMS
 	botSvc := bot.NewService(botRepo, &waSender{tw}, tw)
+	botSvc.SetDeposits(depositSvc) // Phase 1: wire deposit service
 	botHandler := bot.NewHandler(botSvc)
 	smsHandler := bot.NewSMSHandler(botSvc)
 
@@ -99,7 +102,7 @@ func main() {
 	adminRepo := admin.NewRepository(pool)
 	adminHandler := admin.NewHandler(adminRepo, tmpl)
 
-	// ── Cron ─────────────────────────────────────────────────────────────────
+	// ── Cron ──────────────────────────────────────────────────────────────────
 	c := cron.New()
 	if err := botSvc.StartDigest(c); err != nil {
 		slog.Error("digest cron", "error", err)
@@ -112,10 +115,7 @@ func main() {
 	c.Start()
 	defer c.Stop()
 
-	// ── M-Pesa ───────────────────────────────────────────────────────────────
-	// billingHandler is passed directly — RENTLOOP- refs are routed
-	// to billing inside mpesa.Handler, never touching the rent ledger.
-	// paymentNotifier only handles WhatsApp + SMS for rent payments.
+	// ── M-Pesa ────────────────────────────────────────────────────────────────
 	mpesaHandler := mpesa.NewHandler(
 		matcherSvc,
 		ledgerSvc,
@@ -125,7 +125,7 @@ func main() {
 		cfg.IsDevelopment(),
 	)
 
-	// ── Router ───────────────────────────────────────────────────────────────
+	// ── Router ────────────────────────────────────────────────────────────────
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
@@ -146,6 +146,10 @@ func main() {
 				{"TOTAL", "Collected vs expected"},
 				{"RECEIPT 4B", "Resend receipt for a unit"},
 				{"HISTORY 4B", "Last 3 months for a unit"},
+				{"HISTORY-EXT 4B", "Full 12-month history with arrears"},
+				{"LANDLORD-HISTORY", "12-month portfolio performance"},
+				{"DEPOSIT 4B", "Deposit balance for a unit"},
+				{"DEPOSIT-REFUND 4B 15000", "Record deposit refund"},
 				{"MARK 4B PAID 12500 BANK", "Log a cash/bank payment"},
 				{"CLAIM TXN-123 TO 4B", "Assign unmatched payment"},
 				{"ADD UNIT 4B John 0712345678 12500", "Add a unit"},
@@ -161,7 +165,7 @@ func main() {
 	r.Handle("/static/*", http.StripPrefix("/static/",
 		http.FileServer(http.Dir("web/static"))))
 
-	// ── Webhooks ─────────────────────────────────────────────────────────────────
+	// ── Webhooks ──────────────────────────────────────────────────────────────
 	whatsappValidate := appMiddleware.ValidateTwilio(cfg.TwilioToken, cfg.WhatsAppWebhookURL, cfg.IsDevelopment())
 	smsValidate := appMiddleware.ValidateTwilio(cfg.TwilioToken, cfg.SMSWebhookURL, cfg.IsDevelopment())
 
@@ -174,8 +178,6 @@ func main() {
 	r.Post("/admin/login", authHandler.Login)
 	r.Get("/admin/activate", authHandler.Activate)
 	r.Post("/admin/logout", authHandler.Logout)
-
-	// One-time setup — env-gated, self-disables after first admin exists
 	r.Get("/admin/setup", adminHandler.ShowSetup(cfg.AdminSetupSecret, authSvc))
 	r.Post("/admin/setup", adminHandler.DoSetup(cfg.AdminSetupSecret, authSvc))
 
@@ -197,7 +199,7 @@ func main() {
 		})
 	})
 
-	// ── Server ───────────────────────────────────────────────────────────────
+	// ── Server ────────────────────────────────────────────────────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
 		Handler:      r,
@@ -234,11 +236,8 @@ func main() {
 	slog.Info("server stopped cleanly")
 }
 
-// ── Adapters ─────────────────────────────────────────────────────────────────
+// ── Adapters ──────────────────────────────────────────────────────────────────
 
-// paymentNotifier satisfies mpesa.NotifierService.
-// Billing routing is handled inside mpesa.Handler — not here.
-// This adapter only handles rent payment notifications.
 type paymentNotifier struct{ tw *notifier.Twilio }
 
 func (n *paymentNotifier) NotifyLandlord(ctx context.Context, phone string, p *models.Payment, unit *models.Unit, apartmentName string) error {
@@ -249,21 +248,19 @@ func (n *paymentNotifier) NotifyTenant(ctx context.Context, phone string, p *mod
 	return n.tw.NotifyTenant(ctx, phone, p, unit, apartmentName)
 }
 
-// waSender adapts Twilio to bot.Sender — bot replies via WhatsApp.
 type waSender struct{ tw *notifier.Twilio }
 
 func (b *waSender) Send(ctx context.Context, to, msg string) error {
 	return b.tw.SendRaw(ctx, to, msg)
 }
 
-// smsSender adapts Twilio to bot.Sender — onboarding replies via SMS.
 type smsSender struct{ tw *notifier.Twilio }
 
 func (s *smsSender) Send(ctx context.Context, to, msg string) error {
 	return s.tw.SendRawSMS(ctx, to, msg)
 }
 
-// ── Middleware ────────────────────────────────────────────────────────────────
+// ── Middleware ─────────────────────────────────────────────────────────────────
 
 func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

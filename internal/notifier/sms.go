@@ -1,4 +1,4 @@
-// Package notifier provides SMS messaging via Africa’s Talking,
+// Package notifier provides SMS messaging via Africa's Talking,
 // including tenant notifications, landlord alerts, reminders,
 // onboarding messages, and raw SMS sending utilities.
 package notifier
@@ -63,12 +63,21 @@ func (s *SMS) NotifyLandlordSMS(ctx context.Context, phone string, p *models.Pay
 }
 
 // SendReminder sends a payment reminder to an unpaid tenant.
-func (s *SMS) SendReminder(ctx context.Context, phone, tenantName, unitRef string, expectedRent int, month string) error {
-	msg := fmt.Sprintf(
-		"Hi %s, your rent of KES %d for unit %s (%s) is due. "+
-			"Pay via M-Pesa Paybill, account: %s. Thank you.",
-		tenantName, expectedRent, unitRef, month, unitRef,
-	)
+func (s *SMS) SendReminder(ctx context.Context, phone, tenantName, unitRef string, remaining, alreadyPaid int, month string) error {
+	var msg string
+	if alreadyPaid > 0 {
+		msg = fmt.Sprintf(
+			"Hi %s, you have paid KES %s for unit %s (%s) but KES %s is still outstanding. "+
+				"Pay via M-Pesa Paybill, account: %s. Thank you.",
+			tenantName, formatAmount(alreadyPaid), unitRef, month, formatAmount(remaining), unitRef,
+		)
+	} else {
+		msg = fmt.Sprintf(
+			"Hi %s, your rent of KES %s for unit %s (%s) is due. "+
+				"Pay via M-Pesa Paybill, account: %s. Thank you.",
+			tenantName, formatAmount(remaining), unitRef, month, unitRef,
+		)
+	}
 	return s.send(ctx, phone, msg)
 }
 
@@ -100,7 +109,11 @@ func (s *SMS) SendRaw(ctx context.Context, to, message string) error {
 	return s.send(ctx, to, message)
 }
 
-// buildTenantSMS formats the SMS receipt for the tenant.
+// buildTenantSMS formats the SMS receipt for the tenant (Africa's Talking path).
+//
+// Note: The Twilio path now uses buildTenantMessage (in twilio.go) which
+// includes a PaymentStatusOver case. This function is retained for the AT
+// SMS path and has been updated with the same Over case for consistency.
 func buildTenantSMS(p *models.Payment, unit *models.Unit, apartmentName string) string {
 	property := "RentLoop"
 	if apartmentName != "" {
@@ -120,10 +133,17 @@ func buildTenantSMS(p *models.Payment, unit *models.Unit, apartmentName string) 
 	ts := p.PaidAt.In(eatLocation()).Format("02 Jan 15:04")
 
 	switch p.Status {
-	case models.PaymentStatusPaid, models.PaymentStatusOver:
+	case models.PaymentStatusPaid:
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
 				"Rent paid in full. Receipt: #%s.",
+			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
+		)
+	case models.PaymentStatusOver:
+		// FIX 1 (parity): Added overpayment case to match buildTenantMessage.
+		return fmt.Sprintf(
+			"%s: KES %d received for Unit %s on %s. "+
+				"Rent paid in full (overpayment recorded). Receipt: #%s.",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	case models.PaymentStatusPartial:

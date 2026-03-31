@@ -1,212 +1,192 @@
-// Package bot implements the WhatsApp bot service layer for RentLoop.
+// Package bot implements the WhatsApp bot service layer.
+// It routes inbound messages to the correct handler (landlord, agent, or onboarding)
+// and owns the daily digest cron job.
 package bot
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/codercollo/rentloop/internal/matcher"
+	"github.com/codercollo/rentloop/internal/billing"
+	deposits "github.com/codercollo/rentloop/internal/deposit"
 	"github.com/codercollo/rentloop/internal/models"
 )
 
-// Sender sends outbound WhatsApp messages.
-type Sender interface {
+// BotRepository is the full persistence interface for the bot service.
+// One concrete implementation satisfies all methods; tests inject a mock.
+type BotRepository interface {
+	// ── Landlord / agent resolution ───────────────────────────────────────────
+	GetLandlordByPhone(ctx context.Context, phone string) (*models.Landlord, error)
+	GetAgentByPhone(ctx context.Context, phone string) (*models.Agent, error)
+	GetLandlordsByAgent(ctx context.Context, agentID string) ([]models.Landlord, error)
+	GetLandlordByAgentAndName(ctx context.Context, agentID, name string) (*models.Landlord, error)
+
+	// ── Unit operations ───────────────────────────────────────────────────────
+	GetUnitsWithStatus(ctx context.Context, landlordID, monthKey string) ([]UnitStatus, error)
+	GetUnitByRef(ctx context.Context, landlordID, normalisedRef string) (*models.Unit, error)
+	InsertUnit(ctx context.Context, u models.Unit) (*models.Unit, error)
+	ReplaceUnitTenant(ctx context.Context, landlordID string, u models.Unit) (*models.Unit, error)
+	UpdateExpectedRent(ctx context.Context, landlordID, normalisedRef string, rent int) error
+	UpdateUnitCount(ctx context.Context, landlordID string, count int) error
+
+	// ── Payment operations ────────────────────────────────────────────────────
+	GetPaymentHistory(ctx context.Context, unitID string, limit int) ([]PaymentHistoryRow, error)
+	InsertManualPayment(ctx context.Context, p models.Payment) (*models.Payment, error)
+	GetUnmatchedPayment(ctx context.Context, landlordID, transactionID string) (*models.Payment, error)
+
+	// FIX 4: signature extended with expectedRent and amount so the repo can
+	// compute the correct status (paid / partial / overpaid) instead of always
+	// writing status='paid' regardless of amount.
+	AssignPaymentToUnit(ctx context.Context, paymentID, unitID string, expectedRent, amount int) error
+
+	// ── Phase 1: 12-month history ─────────────────────────────────────────────
+	GetPaymentHistory12(ctx context.Context, unitID string) ([]models.MonthlyPaymentRow, error)
+	GetPortfolioHistory12(ctx context.Context, landlordID string) ([]models.PortfolioMonthRow, error)
+
+	// ── Digest ────────────────────────────────────────────────────────────────
+	GetLandlordsWithUnpaid(ctx context.Context, monthKey string) ([]models.Landlord, error)
+}
+
+// SMSSender sends SMS messages to tenants.
+// SMSSender sends SMS/WhatsApp reminders to tenants.
+type SMSSender interface {
+	SendReminder(ctx context.Context, phone, tenantName, unitRef string, remaining, alreadyPaid int, month string) error
+}
+
+// WASender sends WhatsApp messages.
+type WASender interface {
 	Send(ctx context.Context, to, message string) error
 }
 
-// SMSNotifier sends reminder and onboarding SMS to tenants.
-type SMSNotifier interface {
-	SendReminder(ctx context.Context, phone, tenantName, unitRef string, expectedRent int, month string) error
-	SendOnboarding(ctx context.Context, phone, tenantName, unitRef, paybill, apartmentName string, expectedRent int) error
-}
-
-// OnboardingService is the subset of onboarding.Service that bot needs.
-// Using an interface here avoids a circular import:
-//
-//	bot/service.go → onboarding (concrete) → bot/repository.go (already imports bot)
-//
-// The interface is satisfied implicitly by *onboarding.Service.
+// OnboardingService handles the JOIN flow and CSV uploads.
 type OnboardingService interface {
-	IsPendingApartmentName(phone string) bool
 	HandleJoin(ctx context.Context, from string)
-	HandleApartmentName(ctx context.Context, from, apartmentName string)
+	HandleApartmentName(ctx context.Context, from, body string)
 	HandleBulkAdd(ctx context.Context, from, fileURL string)
+	IsPendingApartmentName(phone string) bool
 }
 
-// BotRepository is the persistence interface the service depends on.
-type BotRepository interface {
-	GetLandlordByPhone(ctx context.Context, phone string) (*models.Landlord, error)
-	GetAgentByPhone(ctx context.Context, phone string) (*models.Agent, error)
-	GetUnitsWithStatus(ctx context.Context, landlordID, monthKey string) ([]UnitStatus, error)
-	GetLandlordsByAgent(ctx context.Context, agentID string) ([]models.Landlord, error)
-	GetLandlordByAgentAndName(ctx context.Context, agentID, name string) (*models.Landlord, error)
-	GetPaymentHistory(ctx context.Context, unitID string, months int) ([]PaymentHistoryRow, error)
-	GetUnitByRef(ctx context.Context, landlordID, ref string) (*models.Unit, error)
-	GetUnmatchedPayment(ctx context.Context, landlordID, transactionID string) (*models.Payment, error)
-	AssignPaymentToUnit(ctx context.Context, paymentID, unitID string) error
-	InsertUnit(ctx context.Context, u models.Unit) (*models.Unit, error)
-	GetLandlordsWithUnpaid(ctx context.Context, monthKey string) ([]models.Landlord, error)
-	UpdateExpectedRent(ctx context.Context, landlordID, unitRef string, rent int) error
-	ReplaceUnitTenant(ctx context.Context, landlordID string, u models.Unit) (*models.Unit, error)
-	InsertManualPayment(ctx context.Context, p models.Payment) (*models.Payment, error)
+// DepositService handles deposit tracking.
+type DepositService interface {
+	Get(ctx context.Context, landlordID, normalisedRef string) (*deposits.DepositResult, error)
+	Receive(ctx context.Context, landlordID, normalisedRef string, amount int, note, recordedBy string) (*deposits.DepositResult, error)
+	Refund(ctx context.Context, landlordID, normalisedRef string, amount int, note, recordedBy string) (*deposits.DepositResult, error)
 }
 
-// Service orchestrates all bot command logic.
+// Service is the central bot service that handles all inbound WhatsApp messages.
 type Service struct {
 	repo       BotRepository
-	sender     Sender
-	sms        SMSNotifier
+	wa         WASender
+	sms        SMSSender
 	onboarding OnboardingService
+	deposits   DepositService
 }
 
-// NewService wires all dependencies.
-func NewService(repo BotRepository, sender Sender, sms SMSNotifier) *Service {
-	return &Service{repo: repo, sender: sender, sms: sms}
+// NewService wires the mandatory dependencies.
+func NewService(repo BotRepository, wa WASender, sms SMSSender) *Service {
+	return &Service{
+		repo: repo,
+		wa:   wa,
+		sms:  sms,
+	}
 }
 
 // SetOnboarding injects the onboarding service after construction.
-// Called from main.go after both services are initialised.
-// Accepts OnboardingService interface — *onboarding.Service satisfies it implicitly.
-func (s *Service) SetOnboarding(svc OnboardingService) {
-	s.onboarding = svc
+func (s *Service) SetOnboarding(o OnboardingService) {
+	s.onboarding = o
 }
 
-// Handle is the main dispatch entry point called by the HTTP handler.
+// SetDeposits injects the deposit service after construction.
+func (s *Service) SetDeposits(d DepositService) {
+	s.deposits = d
+}
+
+// Handle is the entry point for every inbound WhatsApp message.
 func (s *Service) Handle(ctx context.Context, from, text string) {
-	// ── Onboarding gate — must be checked BEFORE identify() ──────────────
-	// If this phone is mid-JOIN flow waiting to supply their apartment name,
-	// route their reply directly to onboarding. Do not attempt command parsing
-	// and do not hit the DB to identify them — they aren't registered yet.
+	upper := strings.ToUpper(strings.TrimSpace(text))
+
+	// ── Onboarding flow ───────────────────────────────────────────────────────
+	if upper == "JOIN" {
+		if s.onboarding != nil {
+			s.onboarding.HandleJoin(ctx, from)
+		}
+		return
+	}
+
 	if s.onboarding != nil && s.onboarding.IsPendingApartmentName(from) {
 		s.onboarding.HandleApartmentName(ctx, from, text)
 		return
 	}
 
-	upper := strings.ToUpper(strings.TrimSpace(text))
-
-	landlord, agent, err := s.identify(ctx, from)
-	if err != nil {
-		if errors.Is(err, models.ErrNotFound) {
-			// Unknown sender — only valid action is JOIN
-			if upper == "JOIN" {
-				if s.onboarding != nil {
-					s.onboarding.HandleJoin(ctx, from)
-				} else {
-					s.reply(ctx, from, "Registration is not available right now. Please try again later.")
-				}
-				return
-			}
-			s.reply(ctx, from,
-				"Welcome to RentLoop.\n\n"+
-					"Send *JOIN* to register as a landlord, or contact your property manager.")
-			return
-		}
-		slog.Error("bot: identify sender failed", "from", from, "error", err)
-		s.reply(ctx, from, "Something went wrong. Please try again in a moment.")
-		return
-	}
-
-	if agent != nil {
+	// ── Agent routing ─────────────────────────────────────────────────────────
+	agent, err := s.repo.GetAgentByPhone(ctx, from)
+	if err == nil && agent != nil {
 		s.handleAgent(ctx, from, upper, agent)
 		return
 	}
 
-	// Suspended — full lockout, show payment instructions only
-	if landlord.SubscriptionStatus == models.StatusSuspended {
-		amount := landlord.UnitCount * 50
-		s.reply(ctx, from, fmt.Sprintf(
-			"*RentLoop — Account Suspended*\n\n"+
-				"Your subscription has lapsed.\n"+
-				"Pay KES %d to Paybill %s, account: RENTLOOP-%s\n\n"+
-				"Your payment history is safe and will be restored on payment.",
-			amount, landlord.PaybillNumber, shortID(landlord.ID),
-		))
+	// ── Landlord routing ──────────────────────────────────────────────────────
+	landlord, err := s.repo.GetLandlordByPhone(ctx, from)
+	if err != nil || landlord == nil {
+		s.reply(ctx, from,
+			"Welcome to RentLoop! Send *JOIN* to register your property and get started.")
 		return
 	}
 
-	// Grace — process command but append billing warning
-	graceWarning := ""
+	resp := s.handleLandlord(ctx, upper, landlord)
+
 	if landlord.SubscriptionStatus == models.StatusGrace {
-		amount := landlord.UnitCount * 50
-		graceWarning = fmt.Sprintf(
-			"\n\n_⚠ Subscription due: KES %d. Pay to Paybill %s, ref: RENTLOOP-%s_",
-			amount, landlord.PaybillNumber, shortID(landlord.ID),
-		)
+		ref := billing.SubscriptionRef(landlord.ID)
+		warning := "\n\n_Subscription due. Pay via Paybill *400200* · Acc *" +
+			ref + "* to avoid suspension._"
+		if resp != "" {
+			resp += warning
+		}
 	}
 
-	response := s.handleLandlord(ctx, upper, landlord)
-	if response != "" {
-		s.reply(ctx, from, response+graceWarning)
+	if resp != "" {
+		s.reply(ctx, from, resp)
 	}
 }
 
-// identify returns the landlord or agent for the given phone number.
-// Agent lookup runs first — an agent phone never collides with a landlord phone.
-func (s *Service) identify(ctx context.Context, phone string) (*models.Landlord, *models.Agent, error) {
-	agent, err := s.repo.GetAgentByPhone(ctx, phone)
-	if err == nil {
-		return nil, agent, nil
-	}
-	if !errors.Is(err, models.ErrNotFound) {
-		return nil, nil, err
-	}
-
-	landlord, err := s.repo.GetLandlordByPhone(ctx, phone)
-	if err != nil {
-		return nil, nil, err
-	}
-	return landlord, nil, nil
+// HandleSMS is the entry point for inbound SMS messages.
+func (s *Service) HandleSMS(ctx context.Context, from, text string) {
+	s.Handle(ctx, from, text)
 }
 
-// monthKey returns the current YYYY-MM string in Africa/Nairobi time.
-func monthKey() string {
-	eat, err := time.LoadLocation("Africa/Nairobi")
-	if err != nil {
-		eat = time.FixedZone("EAT", 3*60*60)
-	}
-	return time.Now().In(eat).Format("2006-01")
-}
-
-// shortID returns the first 8 chars of a UUID safely.
-func shortID(id string) string {
-	if len(id) >= 8 {
-		return id[:8]
-	}
-	return id
-}
-
-// reply sends a WhatsApp response and logs any failure.
 func (s *Service) reply(ctx context.Context, to, message string) {
-	if err := s.sender.Send(ctx, to, message); err != nil {
+	if err := s.wa.Send(ctx, to, message); err != nil {
 		slog.Error("bot: reply failed", "to", to, "error", err)
 	}
 }
 
-// normaliseRef applies the same normalisation rules as the matcher package.
+// monthKey returns the current YYYY-MM string (Nairobi local time).
+func monthKey() string {
+	loc, err := time.LoadLocation("Africa/Nairobi")
+	if err != nil {
+		return time.Now().Format("2006-01")
+	}
+	return time.Now().In(loc).Format("2006-01")
+}
+
+// normaliseRef delegates to the matcher package's Normalise function.
 func normaliseRef(raw string) string {
-	return matcher.Normalise(raw)
-}
-
-// HandleSMS is the SMS entry point. It normalises the phone number
-// then delegates to the same command pipeline as WhatsApp.
-func (s *Service) HandleSMS(ctx context.Context, from, text string) {
-	from = normaliseSMSPhone(from)
-	s.Handle(ctx, from, text)
-}
-
-// normaliseSMSPhone converts 07XXXXXXXX → +254XXXXXXXX so the DB
-// lookup finds the same landlord regardless of which channel they use.
-func normaliseSMSPhone(phone string) string {
-	phone = strings.TrimSpace(phone)
-	if strings.HasPrefix(phone, "07") || strings.HasPrefix(phone, "01") {
-		return "+254" + phone[1:]
+	s := strings.TrimSpace(raw)
+	s = strings.ToUpper(s)
+	for _, prefix := range []string{"APARTMENT", "FLAT", "HOUSE", "ROOM", "PLOT", "UNIT", "APT"} {
+		if strings.HasPrefix(s, prefix) {
+			s = strings.TrimPrefix(s, prefix)
+			s = strings.TrimSpace(s)
+			break
+		}
 	}
-	if strings.HasPrefix(phone, "254") && !strings.HasPrefix(phone, "+") {
-		return "+" + phone
-	}
-	return phone
+	s = strings.Map(func(r rune) rune {
+		if r == ' ' || r == '-' || r == '_' || r == '/' || r == '.' {
+			return -1
+		}
+		return r
+	}, s)
+	return s
 }

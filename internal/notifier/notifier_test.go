@@ -129,15 +129,40 @@ func TestTwilio_SendReminder_FormatsCorrectly(t *testing.T) {
 		w.Write([]byte(`{"sid":"SM123"}`))
 	})
 	defer srv.Close()
-
-	err := tw.SendReminder(context.Background(), "254741775492", "John Kamau", "4B", 12500, "March 2026")
+	err := tw.SendReminder(context.Background(), "254741775492", "John Kamau", "4B", 12500, 0, "March 2026")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotBody, "John Kamau") {
 		t.Errorf("expected tenant name in reminder, got: %s", gotBody)
 	}
-	if !strings.Contains(gotBody, "12500") {
+	if !strings.Contains(gotBody, "12,500") { // formatAmount produces comma-separated output
 		t.Errorf("expected amount in reminder, got: %s", gotBody)
+	}
+}
+
+func TestTwilio_SendReminder_Partial_FormatsCorrectly(t *testing.T) {
+	var gotBody string
+	tw, srv := testTwilio(t, func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		gotBody = r.FormValue("Body")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"sid":"SM123"}`))
+	})
+	defer srv.Close()
+
+	// tenant paid 10000 of 12500 — 2500 remaining
+	err := tw.SendReminder(context.Background(), "254741775492", "Peter Njoroge", "E1", 2500, 10000, "March 2026")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(gotBody, "10,000") {
+		t.Errorf("expected already-paid amount in body, got: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, "2,500") {
+		t.Errorf("expected outstanding amount in body, got: %s", gotBody)
+	}
+	if !strings.Contains(gotBody, "outstanding") {
+		t.Errorf("expected 'outstanding' in partial reminder, got: %s", gotBody)
 	}
 }

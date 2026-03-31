@@ -1,44 +1,31 @@
-# /etc/systemd/system/rentloop.service
-#
-# Install:  sudo cp deployments/rentloop.service /etc/systemd/system/
-# Enable:   sudo systemctl daemon-reload && sudo systemctl enable rentloop
-# Start:    sudo systemctl start rentloop
-# Logs:     sudo journalctl -u rentloop -f
-
 [Unit]
-Description=RentLoop rent collection server
-Documentation=https://github.com/codercollo/rentloop
+Description=RentLoop API Server
 After=network.target postgresql.service
-Requires=postgresql.service
+Wants=postgresql.service
 
 [Service]
 Type=simple
 User=rentloop
 Group=rentloop
-WorkingDirectory=/opt/rentloop
 
-# All secrets live here — chmod 600, owned by rentloop user
-# Never commit this file. Create it manually on the droplet.
-EnvironmentFile=/etc/rentloop.env
+# Server binary only — migration is run by deploy.yml before this restarts
+ExecStart=/opt/rentloop/bin/rentloop-server
+ExecReload=/bin/kill -HUP $MAINPID
 
-ExecStart=/opt/rentloop/rentloop
-
-# Restart on any non-zero exit, wait 5s between attempts
 Restart=on-failure
 RestartSec=5s
-StartLimitIntervalSec=60s
-StartLimitBurst=3
 
-# Logs go to journald
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=rentloop
+EnvironmentFile=/etc/rentloop.env
 
-# Harden — no new privileges, private /tmp
+# Hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ReadWritePaths=/opt/rentloop
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rentloop
 
 [Install]
 WantedBy=multi-user.target

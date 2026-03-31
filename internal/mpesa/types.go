@@ -7,14 +7,20 @@
 
 package mpesa
 
+import (
+	"strings"
+
+	"github.com/codercollo/rentloop/internal/models"
+)
+
 // C2BCallback is the exact payload Safaricom Daraja POSTs
 // to your confirmation URL on every C2B payment.
 // Field names match the Daraja API spec exactly — do not rename them.
 type C2BCallback struct {
 	TransactionType   string `json:"TransactionType"`
-	TransID           string `json:"TransID"`           // unique M-Pesa transaction ID
-	TransTime         string `json:"TransTime"`         // YYYYMMDDHHmmss
-	TransAmount       string `json:"TransAmount"`       // string e.g. "12500.00"
+	TransID           string `json:"TransID"` // unique M-Pesa transaction ID
+	TransTime         string `json:"TransTime"`
+	TransAmount       string `json:"TransAmount"`
 	BusinessShortCode string `json:"BusinessShortCode"` // your paybill number
 	BillRefNumber     string `json:"BillRefNumber"`     // account reference — tenant unit e.g. "4B"
 	InvoiceNumber     string `json:"InvoiceNumber"`
@@ -62,4 +68,37 @@ type SimulateRequest struct {
 var successResponse = C2BResponse{
 	ResultCode: "0",
 	ResultDesc: "Accepted",
+}
+
+// knownBankMSISDNPrefixes contains MSISDN prefixes used by bank aggregators.
+var knownBankMSISDNPrefixes = []string{
+	"254100", // Equity Bank
+	"254101",
+	"254200", // KCB
+	"254201",
+	"254300", // Co-op Bank
+}
+
+// DetectPaymentSource determines whether the callback originated from a
+// personal M-Pesa wallet (STK) or a bank Paybill app.
+func DetectPaymentSource(cb C2BCallback) models.PaymentSource {
+	// Safaricom populates ThirdPartyTransID for bank-initiated Paybill flows.
+	if strings.TrimSpace(cb.ThirdPartyTransID) != "" {
+		return models.PaymentSourceBankPaybill
+	}
+
+	msisdn := strings.TrimSpace(cb.MSISDN)
+
+	// No MSISDN — cannot be a personal wallet push.
+	if msisdn == "" {
+		return models.PaymentSourceBankPaybill
+	}
+
+	for _, prefix := range knownBankMSISDNPrefixes {
+		if strings.HasPrefix(msisdn, prefix) {
+			return models.PaymentSourceBankPaybill
+		}
+	}
+
+	return models.PaymentSourceMpesaSTK
 }
