@@ -58,6 +58,21 @@ func (m *mockNotifier) Send(_ context.Context, _, _ string) error {
 	return nil
 }
 
+// ── STK methods required by BillingRepository ──────────────────────────────
+
+func (m *mockRepo) InsertSTKPush(_ context.Context, _, _ string, _ int) error {
+	return nil
+}
+
+func (m *mockRepo) GetSTKRefByReceipt(_ context.Context, _ string) (string, error) {
+	// For tests, we don't care about STK lookup path.
+	return "RENTLOOP-ll-00000", nil
+}
+
+func (m *mockRepo) MarkSTKSuccess(_ context.Context, _, _ string) error {
+	return nil
+}
+
 func activeLandlord(units int) *models.Landlord {
 	return &models.Landlord{
 		ID:                 "ll-00000001-0000-0000-0000-000000000001",

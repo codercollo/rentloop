@@ -4,9 +4,14 @@
 package bot
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/codercollo/rentloop/internal/billing"
@@ -82,6 +87,7 @@ type Service struct {
 	sms        SMSSender
 	onboarding OnboardingService
 	deposits   DepositService
+	payState   sync.Map
 }
 
 // NewService wires the mandatory dependencies.
@@ -107,16 +113,18 @@ func (s *Service) SetDeposits(d DepositService) {
 func (s *Service) Handle(ctx context.Context, from, text string) {
 	upper := strings.ToUpper(strings.TrimSpace(text))
 
-	// ── Onboarding flow ───────────────────────────────────────────────────────
-	if upper == "JOIN" {
-		if s.onboarding != nil {
-			s.onboarding.HandleJoin(ctx, from)
-		}
+	// ── PAY flow ──────────────────────────────────────────────────────────────
+	if upper == "PAY" {
+		s.payState.Store(from, true)
+		s.reply(ctx, from,
+			"To renew your RentLoop subscription, reply with your M-Pesa phone number.\n"+
+				"Example: *0712345678*")
 		return
 	}
 
-	if s.onboarding != nil && s.onboarding.IsPendingApartmentName(from) {
-		s.onboarding.HandleApartmentName(ctx, from, text)
+	if _, ok := s.payState.Load(from); ok {
+		s.payState.Delete(from)
+		s.handlePayPhone(ctx, from, strings.TrimSpace(text))
 		return
 	}
 
@@ -189,4 +197,55 @@ func normaliseRef(raw string) string {
 		return r
 	}, s)
 	return s
+}
+
+func (s *Service) handlePayPhone(ctx context.Context, from, phone string) {
+	// Normalise phone to 254XXXXXXXXX format.
+	e164 := normalisePhone(phone)
+	if e164 == "" {
+		s.reply(ctx, from,
+			"That doesn't look like a valid phone number. Please try again.\nExample: *0712345678*")
+		return
+	}
+
+	landlord, err := s.repo.GetLandlordByPhone(ctx, from)
+	if err != nil {
+		s.reply(ctx, from, "Could not find your account. Please contact support.")
+		return
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"landlord_id": landlord.ID,
+		"phone":       e164,
+	})
+	resp, err := http.Post(
+		os.Getenv("INTERNAL_BASE_URL")+"/billing/stk",
+		"application/json",
+		bytes.NewReader(body),
+	)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		s.reply(ctx, from, "Could not initiate payment. Please try again or contact support.")
+		return
+	}
+
+	s.reply(ctx, from,
+		"✅ Check your phone and enter your M-Pesa PIN to complete payment.\n"+
+			"Your account will be reactivated automatically once confirmed.")
+}
+
+// normalisePhone converts 07XXXXXXXX or +254XXXXXXXXX to 254XXXXXXXXX.
+func normalisePhone(raw string) string {
+	p := strings.TrimSpace(raw)
+	p = strings.ReplaceAll(p, " ", "")
+	p = strings.TrimPrefix(p, "+")
+	if strings.HasPrefix(p, "07") && len(p) == 10 {
+		return "254" + p[1:]
+	}
+	if strings.HasPrefix(p, "01") && len(p) == 10 {
+		return "254" + p[1:]
+	}
+	if strings.HasPrefix(p, "254") && len(p) == 12 {
+		return p
+	}
+	return ""
 }

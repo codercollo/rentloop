@@ -1,34 +1,28 @@
 name: Deploy to Production
-
 on:
   workflow_run:
     workflows: ["Test"]
     branches: [main]
     types: [completed]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     # Only deploy if the Test workflow actually passed
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
           cache: true
-
       - name: Build
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go build -ldflags="-s -w" \
             -o rentloop-server ./cmd/server
-
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go build -ldflags="-s -w" \
             -o rentloop-migrate ./cmd/migrate
-
       - name: Copy to droplet
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -38,7 +32,6 @@ jobs:
           source: "rentloop-server,rentloop-migrate,internal/db/migrations"
           target: "/opt/rentloop"
           overwrite: true
-
       - name: Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -49,8 +42,10 @@ jobs:
             set -e
             cd /opt/rentloop
 
-            chmod +x rentloop-server rentloop-migrate
+            # Keep previous binary for rollback
+            cp rentloop-server rentloop-server.prev 2>/dev/null || true
 
+            chmod +x rentloop-server rentloop-migrate
             set -a && source /etc/rentloop.env && set +a
 
             ./rentloop-migrate
@@ -59,7 +54,18 @@ jobs:
             sudo systemctl restart rentloop
             echo "✓ service restarted"
 
-            sleep 4
+            # Retry health check up to 10 times (20s window)
+            for i in $(seq 1 10); do
+              if curl -sf http://localhost:8080/health | grep -q '"status":"ok"'; then
+                echo "✓ health check passed"
+                exit 0
+              fi
+              echo "waiting for service... ($i/10)"
+              sleep 2
+            done
 
-            curl -sf http://localhost:8080/health | grep -q '"status":"ok"'
-            echo "✓ health check passed"
+            # Health check timed out — roll back to previous binary
+            echo "✗ health check timed out — rolling back"
+            cp rentloop-server.prev rentloop-server
+            sudo systemctl restart rentloop
+            exit 1
