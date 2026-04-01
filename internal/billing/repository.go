@@ -240,3 +240,39 @@ func (r *Repository) GetAllActive(ctx context.Context) ([]models.Landlord, error
 // FreeTierLimit is the unit count below which billing never runs.
 // Matches FREE_TIER_UNIT_LIMIT in config.
 var _ = time.Now // keep time import
+
+func (r *Repository) InsertSTKPush(ctx context.Context, landlordID, ref string, amount int) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO stk_pushes (landlord_id, checkout_ref, amount)
+		VALUES ($1, $2, $3)
+	`, landlordID, ref, amount)
+	return err
+}
+
+func (r *Repository) GetSTKRefByReceipt(ctx context.Context, receipt string) (string, error) {
+	// On success we mark the push and return the ref.
+	// For simplicity, store the ref alongside the receipt when we update.
+	var ref string
+	err := r.db.QueryRow(ctx, `
+		SELECT checkout_ref FROM stk_pushes
+		WHERE  mpesa_receipt = $1
+		LIMIT  1
+	`, receipt).Scan(&ref)
+	if err != nil {
+		return "", fmt.Errorf("get stk ref by receipt: %w", err)
+	}
+	return ref, nil
+}
+
+func (r *Repository) MarkSTKSuccess(ctx context.Context, receipt string, landlordID string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE stk_pushes
+		SET    mpesa_receipt = $1,
+		       status        = 'success',
+		       updated_at    = NOW()
+		WHERE  landlord_id   = $2
+		  AND  status        = 'pending'
+		  AND  created_at    > NOW() - INTERVAL '30 minutes'
+	`, receipt, landlordID)
+	return err
+}

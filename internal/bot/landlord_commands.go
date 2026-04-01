@@ -1013,8 +1013,8 @@ func suspendedMsg(landlordID string) string {
 		ref = ref[:8]
 	}
 	return "*Suspended*\n\nYour RentLoop subscription has lapsed.\n" +
-		"Pay via Paybill *400200* · Account *RENTLOOP-" + ref + "*\n" +
-		"Contact support if this is an error."
+		"Reply *PAY* to renew via M-Pesa STK Push.\n\n" +
+		"Or pay manually: Paybill *400200* · Account *RENTLOOP-" + ref + "*"
 }
 
 func eatLocation() *time.Location {

@@ -28,6 +28,7 @@ import (
 	appMiddleware "github.com/codercollo/rentloop/internal/middleware"
 	"github.com/codercollo/rentloop/internal/models"
 	"github.com/codercollo/rentloop/internal/mpesa"
+	"github.com/codercollo/rentloop/internal/mpesa/stk"
 	"github.com/codercollo/rentloop/internal/notifier"
 	"github.com/codercollo/rentloop/internal/onboarding"
 )
@@ -92,6 +93,9 @@ func main() {
 		cfg.FreeTierUnitLimit,
 	)
 	billingHandler := billing.NewHandler(billingSvc)
+
+	stkClient := stk.NewClient()
+	billingHandler.SetSTKClient(stkClient)
 
 	// ── Auth ──────────────────────────────────────────────────────────────────
 	authRepo := auth.NewRepository(pool)
@@ -192,6 +196,9 @@ func main() {
 		r.Get("/admin/agents", adminHandler.Agents)
 		r.Get("/admin/payments", adminHandler.Payments)
 		r.Get("/admin/payments/unmatched", adminHandler.UnmatchedPayments)
+
+		r.Post("/billing/stk", billingHandler.TriggerSTK)
+		r.With(appMiddleware.MpesaRateLimit).Post("/mpesa/stk/callback", mpesaHandler.STKCallback)
 
 		r.Get("/admin/payments/partial", func(w http.ResponseWriter, r *http.Request) {
 			payments, _ := adminRepo.GetRecentPayments(r.Context())

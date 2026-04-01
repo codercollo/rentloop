@@ -17,6 +17,9 @@ type BillingRepository interface {
 	GetGraceAccounts(ctx context.Context, graceDays int) ([]models.Landlord, error)
 	SetStatus(ctx context.Context, landlordID string, status models.SubscriptionStatus) error
 	Activate(ctx context.Context, landlordID string) error
+	GetSTKRefByReceipt(ctx context.Context, receipt string) (string, error)
+	MarkSTKSuccess(ctx context.Context, receipt string, landlordID string) error
+	InsertSTKPush(ctx context.Context, landlordID, ref string, amount int) error
 	RecordPayment(ctx context.Context, p models.SubscriptionPayment) error
 	GetLandlordByRef(ctx context.Context, ref string) (*models.Landlord, error)
 }
@@ -137,6 +140,18 @@ func (s *Service) ProcessPayment(ctx context.Context, transactionID, ref string,
 		_ = s.notifier.Send(ctx, landlord.WhatsAppPhone, msg)
 	}
 	return nil
+}
+
+// ProcessPaymentByReceipt handles an STK success where we have the M-Pesa
+// receipt and amount but need to resolve the landlord via a pending STK record.
+// It delegates to ProcessPayment after resolving the subscription ref.
+func (s *Service) ProcessPaymentByReceipt(ctx context.Context, receipt string, amount int) error {
+	// Look up the pending STK push record to get the landlord ref.
+	ref, err := s.repo.GetSTKRefByReceipt(ctx, receipt)
+	if err != nil {
+		return fmt.Errorf("stk: resolve ref for receipt %s: %w", receipt, err)
+	}
+	return s.ProcessPayment(ctx, receipt, ref, amount)
 }
 
 // TransitionExpired moves active paid accounts to grace when their cycle ends.
