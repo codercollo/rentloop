@@ -2,9 +2,14 @@
 package bot
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -103,6 +108,24 @@ func (s *Service) handleAgent(ctx context.Context, from, upper string, a *models
 			unitRef := parts[len(parts)-1]
 			name := strings.Join(parts[1:len(parts)-1], " ")
 			response = s.agentCmdDeposit(ctx, a, name, unitRef)
+		}
+
+	case "PAY":
+		// PAY <landlord name>
+		if len(parts) < 2 {
+			response = "Usage: PAY <landlord name>\nExample: PAY Wanjiku"
+		} else {
+			response = s.agentCmdPay(ctx, from, a, strings.Join(parts[1:], " "))
+		}
+
+	case "BILLING":
+		// BILLING <landlord name> or BILLING ALL
+		if len(parts) >= 2 && strings.ToUpper(parts[1]) == "ALL" {
+			response = s.agentCmdBillingAll(ctx, a)
+		} else if len(parts) < 2 {
+			response = s.agentCmdBillingAll(ctx, a)
+		} else {
+			response = s.agentCmdBilling(ctx, a, strings.Join(parts[1:], " "))
 		}
 
 	case "HELP":
@@ -997,6 +1020,123 @@ func (s *Service) agentCmdDepositAll(ctx context.Context, a *models.Agent) strin
 	return sb.String()
 }
 
+// ── BILLING ───────────────────────────────────────────────────────────────────
+
+func (s *Service) agentCmdBillingAll(ctx context.Context, a *models.Agent) string {
+	landlords, err := s.repo.GetLandlordsByAgent(ctx, a.ID)
+	if err != nil {
+		return "Could not load clients. Please try again."
+	}
+	if len(landlords) == 0 {
+		return "No landlords registered under your account yet."
+	}
+
+	sb := &strings.Builder{}
+	fmt.Fprintf(sb, "*RentLoop — Billing Status*\n")
+
+	for i := range landlords {
+		l := &landlords[i]
+		label := apartmentLabel(l)
+		var icon, note string
+		switch l.SubscriptionStatus {
+		case models.StatusActive:
+			icon = "✓"
+			if l.BillingCycleEnd != nil {
+				note = fmt.Sprintf("active until %s", l.BillingCycleEnd.Format("02 Jan 2006"))
+			} else {
+				note = "active"
+			}
+		case models.StatusGrace:
+			icon = "⚠"
+			note = "grace period — payment due"
+		case models.StatusSuspended:
+			icon = "✗"
+			note = "suspended"
+		default:
+			icon = "·"
+			note = string(l.SubscriptionStatus)
+		}
+		fmt.Fprintf(sb, "\n%s *%s* — %s", icon, label, note)
+		fmt.Fprintf(sb, "\n  Units: %d", l.UnitCount)
+	}
+
+	sb.WriteString("\n\nReply *PAY <name>* to trigger STK push for a landlord.")
+	return sb.String()
+}
+
+func (s *Service) agentCmdBilling(ctx context.Context, a *models.Agent, name string) string {
+	landlord, err := s.repo.GetLandlordByAgentAndName(ctx, a.ID, name)
+	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			return fmt.Sprintf("No landlord found matching %q.", name)
+		}
+		return "Could not find landlord. Please try again."
+	}
+
+	label := apartmentLabel(landlord)
+	var statusLine string
+	switch landlord.SubscriptionStatus {
+	case models.StatusActive:
+		if landlord.BillingCycleEnd != nil {
+			statusLine = fmt.Sprintf("✓ Active until %s", landlord.BillingCycleEnd.Format("02 Jan 2006"))
+		} else {
+			statusLine = "✓ Active"
+		}
+	case models.StatusGrace:
+		statusLine = "⚠ Grace period — payment overdue"
+	case models.StatusSuspended:
+		statusLine = "✗ Suspended"
+	default:
+		statusLine = string(landlord.SubscriptionStatus)
+	}
+
+	return fmt.Sprintf(
+		"*Billing — %s*\n\nStatus: %s\nUnits: %d\n\nReply *PAY %s* to send STK push to the landlord.",
+		label, statusLine, landlord.UnitCount, landlord.Name,
+	)
+}
+
+// agentCmdPay triggers an STK push on behalf of a landlord.
+// The agent provides the landlord name; the bot uses the landlord's
+// own WhatsApp number as the M-Pesa target phone.
+func (s *Service) agentCmdPay(ctx context.Context, agentPhone string, a *models.Agent, name string) string {
+	landlord, err := s.repo.GetLandlordByAgentAndName(ctx, a.ID, name)
+	if err != nil {
+		if errors.Is(err, models.ErrNotFound) {
+			return fmt.Sprintf("No landlord found matching %q.", name)
+		}
+		return "Could not find landlord. Please try again."
+	}
+
+	// Normalise the landlord's WhatsApp phone to E.164 without +
+	phone := normalisePhone(landlord.WhatsAppPhone)
+	if phone == "" {
+		return fmt.Sprintf("No valid phone on record for %s. Contact support.", landlord.Name)
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"landlord_id": landlord.ID,
+		"phone":       phone,
+	})
+	resp, err := http.Post(
+		os.Getenv("INTERNAL_BASE_URL")+"/billing/stk",
+		"application/json",
+		bytes.NewReader(body),
+	)
+	if err != nil || (resp != nil && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent) {
+		slog.Error("agent pay: stk trigger failed", "landlord_id", landlord.ID)
+		return "Could not initiate payment. Please try again or contact support."
+	}
+	if resp.StatusCode == http.StatusNoContent {
+		return fmt.Sprintf("%s is on the free tier — no payment required.", apartmentLabel(landlord))
+	}
+
+	return fmt.Sprintf(
+		"✅ STK push sent to *%s* (%s).\nProperty: %s\nThey should enter their M-Pesa PIN to complete payment.",
+		landlord.Name, landlord.WhatsAppPhone, apartmentLabel(landlord),
+	)
+}
+
 // Avoids importing errors in every call site.
 func isNotFound(err error) bool {
 	return err != nil && (err.Error() == models.ErrNotFound.Error() ||
@@ -1019,5 +1159,9 @@ func agentHelpText() string {
 		"*LANDLORD-HISTORY Wanjiku* — 12-month portfolio performance\n" +
 		"*DEPOSIT Wanjiku A1* — deposit for one unit\n" +
 		"*DEPOSIT STATUS ALL* — all deposits across portfolio\n" +
-		"*DEPOSIT STATUS Wanjiku* — all deposits for one landlord"
+		"*DEPOSIT STATUS Wanjiku* — all deposits for one landlord\n" +
+		"*BILLING ALL* — subscription status for all landlords\n" +
+		"*BILLING Wanjiku* — billing detail for one landlord\n" +
+		"*PAY Wanjiku* — trigger M-Pesa STK push for a landlord"
+
 }

@@ -221,7 +221,7 @@ func (r *Repository) GetSubscriptionPayments(ctx context.Context, landlordID str
 	return results, rows.Err()
 }
 
-// GetAllLandlords returns all landlords for status transition cron.
+// GetAllActive returns all landlords for status transition cron.
 func (r *Repository) GetAllActive(ctx context.Context) ([]models.Landlord, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, whatsapp_phone, name, paybill_number,
@@ -238,20 +238,17 @@ func (r *Repository) GetAllActive(ctx context.Context) ([]models.Landlord, error
 }
 
 // FreeTierLimit is the unit count below which billing never runs.
-// Matches FREE_TIER_UNIT_LIMIT in config.
 var _ = time.Now // keep time import
 
-func (r *Repository) InsertSTKPush(ctx context.Context, landlordID, ref string, amount int) error {
+func (r *Repository) InsertSTKPush(ctx context.Context, landlordID, ref, checkoutID string, amount int) error {
 	_, err := r.db.Exec(ctx, `
-		INSERT INTO stk_pushes (landlord_id, checkout_ref, amount)
-		VALUES ($1, $2, $3)
-	`, landlordID, ref, amount)
+        INSERT INTO stk_pushes (landlord_id, checkout_ref, checkout_id, amount)
+        VALUES ($1, $2, $3, $4)
+    `, landlordID, ref, checkoutID, amount)
 	return err
 }
 
 func (r *Repository) GetSTKRefByReceipt(ctx context.Context, receipt string) (string, error) {
-	// On success we mark the push and return the ref.
-	// For simplicity, store the ref alongside the receipt when we update.
 	var ref string
 	err := r.db.QueryRow(ctx, `
 		SELECT checkout_ref FROM stk_pushes
@@ -274,5 +271,45 @@ func (r *Repository) MarkSTKSuccess(ctx context.Context, receipt string, landlor
 		  AND  status        = 'pending'
 		  AND  created_at    > NOW() - INTERVAL '30 minutes'
 	`, receipt, landlordID)
+	return err
+}
+
+// SubscriptionPaymentExists returns true if a row with this transaction_id
+// already exists in subscription_payments.
+// Used by ProcessPayment to enforce idempotency and prevent double-activation.
+func (r *Repository) SubscriptionPaymentExists(ctx context.Context, transactionID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, // FIX: was r.pool (field is named r.db)
+		`SELECT EXISTS(SELECT 1 FROM subscription_payments WHERE transaction_id = $1)`,
+		transactionID,
+	).Scan(&exists)
+	return exists, err
+}
+
+// GetSTKRefByCheckoutID returns the subscription ref for a pending STK push.
+// Matched by CheckoutRequestID which Daraja returns when push is initiated.
+func (r *Repository) GetSTKRefByCheckoutID(ctx context.Context, checkoutID string) (string, error) {
+	var ref string
+	err := r.db.QueryRow(ctx, `
+		SELECT checkout_ref FROM stk_pushes
+		WHERE  checkout_id = $1
+		LIMIT  1
+	`, checkoutID).Scan(&ref)
+	if err != nil {
+		return "", fmt.Errorf("get stk ref by checkout_id: %w", err)
+	}
+	return ref, nil
+}
+
+// MarkSTKSuccessByCheckoutID writes the M-Pesa receipt onto the pending row.
+func (r *Repository) MarkSTKSuccessByCheckoutID(ctx context.Context, checkoutID, receipt string) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE stk_pushes
+		SET    mpesa_receipt = $1,
+		       status        = 'success',
+		       updated_at    = NOW()
+		WHERE  checkout_id   = $2
+		  AND  status        = 'pending'
+	`, receipt, checkoutID)
 	return err
 }

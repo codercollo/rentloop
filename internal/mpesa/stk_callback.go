@@ -74,6 +74,6 @@ func (h *Handler) STKCallback(w http.ResponseWriter, r *http.Request) {
 	log.Info("stk callback: success", "receipt", receipt, "amount", amount)
 
 	if h.billing != nil {
-		h.billing.ProcessSubscriptionFromSTK(receipt, amount)
+		h.billing.ProcessSubscriptionFromSTK(cb.CheckoutRequestID, receipt, amount)
 	}
 }

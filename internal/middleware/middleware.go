@@ -4,6 +4,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -278,6 +279,18 @@ func CORS(opts CORSOptions) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// RequireInternal blocks requests not originating from localhost.
+func RequireInternal(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := r.RemoteAddr
+		if strings.HasPrefix(ip, "127.0.0.1") || strings.HasPrefix(ip, "[::1]") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	})
 }
 
 func joinStrings(ss []string, sep string) string {

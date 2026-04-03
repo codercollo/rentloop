@@ -11,12 +11,12 @@ import (
 // Handler routes subscription payments to the billing service.
 type Handler struct {
 	svc *Service
-	stk STKPusher // injected via SetSTKClient
+	stk STKPusher
 }
 
 // STKPusher is satisfied by stk.Client.
 type STKPusher interface {
-	Push(ctx context.Context, phone string, amount int, accountRef string) error
+	Push(ctx context.Context, phone string, amount int, accountRef string) (string, error)
 }
 
 // NewHandler wires the service.
@@ -25,7 +25,6 @@ func NewHandler(svc *Service) *Handler {
 }
 
 // SetSTKClient injects the STK client after construction.
-// Call this in main.go after NewHandler.
 func (h *Handler) SetSTKClient(c STKPusher) {
 	h.stk = c
 }
@@ -57,12 +56,10 @@ func (h *Handler) TriggerSTK(w http.ResponseWriter, r *http.Request) {
 
 	amount := h.svc.MonthlyAmount(landlord.UnitCount)
 	if amount == 0 {
-		// Free tier — nothing to charge.
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	// Reference format matches IsSubscriptionPayment() prefix check.
 	ref := SubscriptionRef(landlord.ID)
 
 	if h.stk == nil {
@@ -70,11 +67,16 @@ func (h *Handler) TriggerSTK(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.stk.Push(ctx, req.Phone, amount, ref); err != nil {
-		slog.Error("billing: stk push failed",
-			"landlord_id", req.LandlordID, "error", err)
+	checkoutID, err := h.stk.Push(ctx, req.Phone, amount, ref)
+	if err != nil {
+		slog.Error("billing: stk push failed", "landlord_id", req.LandlordID, "error", err)
 		http.Error(w, "stk push failed", http.StatusBadGateway)
 		return
+	}
+
+	if err := h.svc.repo.InsertSTKPush(ctx, landlord.ID, ref, checkoutID, amount); err != nil {
+		slog.Error("billing: insert stk push record", "landlord_id", req.LandlordID, "error", err)
+		// non-fatal — push already sent to phone
 	}
 
 	slog.Info("billing: stk push initiated",
@@ -82,29 +84,32 @@ func (h *Handler) TriggerSTK(w http.ResponseWriter, r *http.Request) {
 		"amount", amount,
 		"ref", ref,
 	)
-
 	w.WriteHeader(http.StatusOK)
 }
 
 // ProcessSubscriptionFromSTK is called by the STK callback handler.
-// It reuses the same ProcessPayment path as C2B paybill payments.
-func (h *Handler) ProcessSubscriptionFromSTK(receipt string, amount int) {
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
+// Resolves landlord via CheckoutRequestID, marks the push row success,
+// then runs the same ProcessPayment path as C2B paybill payments.
+func (h *Handler) ProcessSubscriptionFromSTK(checkoutID, receipt string, amount int) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-		// We don't have the landlord ref from the STK callback metadata directly,
-		// but the receipt IS the transaction_id — pass it with the RENTLOOP- prefix
-		// if you store the CheckoutRequestID→ref mapping, or look up by receipt.
-		// Simplest safe approach: look up by receipt (transaction_id).
-		if err := h.svc.ProcessPaymentByReceipt(ctx, receipt, amount); err != nil {
-			slog.Error("billing: process stk subscription",
-				"receipt", receipt, "error", err)
-		}
-	}()
+	ref, err := h.svc.repo.GetSTKRefByCheckoutID(ctx, checkoutID)
+	if err != nil {
+		slog.Error("billing: process stk subscription", "checkout_id", checkoutID, "error", err)
+		return
+	}
+
+	if err := h.svc.repo.MarkSTKSuccessByCheckoutID(ctx, checkoutID, receipt); err != nil {
+		slog.Error("billing: mark stk success", "checkout_id", checkoutID, "error", err)
+	}
+
+	if err := h.svc.ProcessPayment(ctx, receipt, ref, amount); err != nil {
+		slog.Error("billing: activate from stk", "receipt", receipt, "error", err)
+	}
 }
 
-// ProcessSubscription is called by the mpesa handler (not HTTP)
+// ProcessSubscription is called by the mpesa C2B handler
 // when the account ref starts with RENTLOOP-.
 func (h *Handler) ProcessSubscription(transactionID, ref string, amount int) {
 	go func() {

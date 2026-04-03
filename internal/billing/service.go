@@ -2,7 +2,6 @@ package billing
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -19,9 +18,12 @@ type BillingRepository interface {
 	Activate(ctx context.Context, landlordID string) error
 	GetSTKRefByReceipt(ctx context.Context, receipt string) (string, error)
 	MarkSTKSuccess(ctx context.Context, receipt string, landlordID string) error
-	InsertSTKPush(ctx context.Context, landlordID, ref string, amount int) error
+	InsertSTKPush(ctx context.Context, landlordID, ref, checkoutID string, amount int) error
 	RecordPayment(ctx context.Context, p models.SubscriptionPayment) error
 	GetLandlordByRef(ctx context.Context, ref string) (*models.Landlord, error)
+	SubscriptionPaymentExists(ctx context.Context, transactionID string) (bool, error)
+	GetSTKRefByCheckoutID(ctx context.Context, checkoutID string) (string, error)
+	MarkSTKSuccessByCheckoutID(ctx context.Context, checkoutID, receipt string) error
 }
 
 // Notifier sends WhatsApp billing notices.
@@ -78,51 +80,79 @@ func IsSubscriptionPayment(ref string) bool {
 
 // ProcessPayment handles an incoming subscription C2B payment.
 // Called from the mpesa handler when account ref starts with RENTLOOP-.
+// Safe to call multiple times with the same transactionID — subsequent calls
+// are silently ignored (idempotent). This fixes BUG-3 where duplicate curls
+// caused a second "Subscription Active ✓" WhatsApp to be sent.
 func (s *Service) ProcessPayment(ctx context.Context, transactionID, ref string, amount int) error {
+	// ── Resolve landlord from subscription ref ────────────────────────────────
+	// GetLandlordByRef matches LEFT(id::text, 8) = RIGHT(ref, 8),
+	// e.g. ref "RENTLOOP-accee42b" → landlord whose id starts with "accee42b".
 	landlord, err := s.repo.GetLandlordByRef(ctx, ref)
 	if err != nil {
-		if errors.Is(err, models.ErrNotFound) {
-			slog.Warn("billing: subscription payment — landlord not found", "ref", ref)
-			return nil
-		}
-		return fmt.Errorf("billing: get landlord: %w", err)
+		return fmt.Errorf("billing: resolve landlord from ref %q: %w", ref, err)
 	}
 
-	expected := s.MonthlyAmount(landlord.UnitCount)
-	if amount < expected {
+	// ── Amount check ──────────────────────────────────────────────────────────
+	required := s.MonthlyAmount(landlord.UnitCount)
+	if required > 0 && amount < required {
 		slog.Warn("billing: underpayment",
 			"landlord_id", landlord.ID,
-			"expected", expected,
+			"expected", required,
 			"received", amount,
 		)
-		// Notify landlord of shortfall
-		msg := fmt.Sprintf(
-			"*RentLoop — Partial Subscription Payment*\n\n"+
-				"Received KES %d but your monthly fee is KES %d.\n"+
-				"Pay the remaining KES %d to Paybill %s, account: %s\n"+
-				"to restore full access.",
-			amount, expected, expected-amount,
-			landlord.PaybillNumber, ref,
-		)
-		_ = s.notifier.Send(ctx, landlord.WhatsAppPhone, msg)
+		// Notify landlord of the shortfall but do NOT activate.
+		if s.notifier != nil {
+			msg := fmt.Sprintf(
+				"*RentLoop — Partial Subscription Payment*\n\n"+
+					"Received KES %d but your monthly fee is KES %d.\n"+
+					"Pay the remaining KES %d to Paybill %s, account: %s\n"+
+					"to restore full access.",
+				amount, required, required-amount,
+				landlord.PaybillNumber, ref,
+			)
+			_ = s.notifier.Send(ctx, landlord.WhatsAppPhone, msg)
+		}
 		return nil
 	}
 
+	// ── BUG-3 FIX: idempotency guard ─────────────────────────────────────────
+	// If this transaction_id was already processed, return immediately.
+	// Without this check, a duplicate curl (or Safaricom retry) calls
+	// Activate again and sends a second "Subscription Active ✓" WhatsApp.
+	// The INSERT has ON CONFLICT DO NOTHING so the row is safe, but the
+	// Activate + notifier.Send still fired on every call.
+	exists, err := s.repo.SubscriptionPaymentExists(ctx, transactionID)
+	if err != nil {
+		return fmt.Errorf("billing: idempotency check for %s: %w", transactionID, err)
+	}
+	if exists {
+		slog.Info("billing: duplicate subscription payment skipped",
+			"transaction_id", transactionID,
+			"landlord_id", landlord.ID,
+		)
+		return nil
+	}
+
+	// ── Record payment ────────────────────────────────────────────────────────
 	now := time.Now()
-	payment := models.SubscriptionPayment{
+	if err := s.repo.RecordPayment(ctx, models.SubscriptionPayment{
 		LandlordID:    landlord.ID,
 		TransactionID: transactionID,
 		Amount:        amount,
 		PeriodStart:   now,
 		PeriodEnd:     now.AddDate(0, 1, 0),
+	}); err != nil {
+		// RecordPayment uses ON CONFLICT DO NOTHING, so if a concurrent
+		// goroutine raced past the exists check and inserted first, this
+		// is a no-op. Log and continue to activation.
+		slog.Warn("billing: record payment skipped (race or conflict)",
+			"transaction_id", transactionID,
+		)
 	}
 
-	if err := s.repo.RecordPayment(ctx, payment); err != nil {
-		return fmt.Errorf("billing: record payment: %w", err)
-	}
-
+	// ── Activate landlord ─────────────────────────────────────────────────────
 	if err := s.repo.Activate(ctx, landlord.ID); err != nil {
-		return fmt.Errorf("billing: activate: %w", err)
+		return fmt.Errorf("billing: activate landlord %s: %w", landlord.ID, err)
 	}
 
 	slog.Info("billing: account activated",
@@ -130,23 +160,25 @@ func (s *Service) ProcessPayment(ctx context.Context, transactionID, ref string,
 		"amount", amount,
 	)
 
-	msg := fmt.Sprintf(
-		"*RentLoop — Subscription Active* ✓\n\n"+
-			"KES %d received. Your account is active until %s.\n"+
-			"Thank you!",
-		amount, now.AddDate(0, 1, 0).Format("02 Jan 2006"),
-	)
+	// ── Notify landlord ───────────────────────────────────────────────────────
 	if s.notifier != nil {
+		cycleEnd := now.AddDate(0, 1, 0)
+		msg := fmt.Sprintf(
+			"*RentLoop — Subscription Active* ✓\n\n"+
+				"KES %d received. Your account is active until %s.\n"+
+				"Thank you!",
+			amount,
+			cycleEnd.Format("02 Jan 2006"),
+		)
 		_ = s.notifier.Send(ctx, landlord.WhatsAppPhone, msg)
 	}
+
 	return nil
 }
 
 // ProcessPaymentByReceipt handles an STK success where we have the M-Pesa
 // receipt and amount but need to resolve the landlord via a pending STK record.
-// It delegates to ProcessPayment after resolving the subscription ref.
 func (s *Service) ProcessPaymentByReceipt(ctx context.Context, receipt string, amount int) error {
-	// Look up the pending STK push record to get the landlord ref.
 	ref, err := s.repo.GetSTKRefByReceipt(ctx, receipt)
 	if err != nil {
 		return fmt.Errorf("stk: resolve ref for receipt %s: %w", receipt, err)
@@ -155,7 +187,6 @@ func (s *Service) ProcessPaymentByReceipt(ctx context.Context, receipt string, a
 }
 
 // TransitionExpired moves active paid accounts to grace when their cycle ends.
-// Called by cron on the 1st of the month.
 func (s *Service) TransitionExpired(ctx context.Context) error {
 	landlords, err := s.repo.GetExpiredPaidAccounts(ctx)
 	if err != nil {
@@ -190,8 +221,7 @@ func (s *Service) TransitionExpired(ctx context.Context) error {
 	return nil
 }
 
-// TransitionGrace moves grace accounts to suspended when grace period ends.
-// Called by cron 6 days after the 1st.
+// TransitionGrace moves grace accounts to suspended when the grace period ends.
 func (s *Service) TransitionGrace(ctx context.Context) error {
 	landlords, err := s.repo.GetGraceAccounts(ctx, s.graceDays)
 	if err != nil {

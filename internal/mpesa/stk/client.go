@@ -47,13 +47,13 @@ func NewClient() *Client {
 	}
 }
 
-// Push initiates an STK Push to the given phone number.
+// Push initiates an STK Push and returns Daraja's CheckoutRequestID.
 // phone must be in international format without '+': e.g. "254712345678".
 // accountRef appears on the customer's M-Pesa confirmation SMS.
-func (c *Client) Push(ctx context.Context, phone string, amount int, accountRef string) error {
+func (c *Client) Push(ctx context.Context, phone string, amount int, accountRef string) (string, error) {
 	token, err := c.token(ctx)
 	if err != nil {
-		return fmt.Errorf("stk: oauth: %w", err)
+		return "", fmt.Errorf("stk: oauth: %w", err)
 	}
 
 	timestamp := time.Now().Format("20060102150405")
@@ -79,20 +79,20 @@ func (c *Client) Push(ctx context.Context, phone string, amount int, accountRef 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.baseURL+"/mpesa/stkpush/v1/processrequest", bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("stk: build request: %w", err)
+		return "", fmt.Errorf("stk: build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("stk: push request: %w", err)
+		return "", fmt.Errorf("stk: push request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("stk: daraja %d: %s", resp.StatusCode, raw)
+		return "", fmt.Errorf("stk: daraja %d: %s", resp.StatusCode, raw)
 	}
 
 	var result struct {
@@ -101,12 +101,12 @@ func (c *Client) Push(ctx context.Context, phone string, amount int, accountRef 
 		CheckoutID   string `json:"CheckoutRequestID"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("stk: decode response: %w", err)
+		return "", fmt.Errorf("stk: decode response: %w", err)
 	}
 	if result.ResponseCode != "0" {
-		return fmt.Errorf("stk: daraja rejected: %s", result.ResponseDesc)
+		return "", fmt.Errorf("stk: daraja rejected: %s", result.ResponseDesc)
 	}
-	return nil
+	return result.CheckoutID, nil
 }
 
 // token fetches a short-lived OAuth2 bearer token from Daraja.
@@ -134,5 +134,4 @@ func (c *Client) token(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("empty access token")
 	}
 	return tok.AccessToken, nil
-
 }
