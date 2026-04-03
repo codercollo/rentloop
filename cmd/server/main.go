@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -239,6 +240,12 @@ func main() {
 		r.Post("/billing/stk", billingHandler.TriggerSTK)
 	})
 
+	// Dev-only: serve locally saved receipt PDFs
+	if cfg.IsDevelopment() {
+		r.Handle("/dev/receipts/*",
+			http.StripPrefix("/dev/receipts/", http.FileServer(http.Dir("tmp/receipts"))))
+	}
+
 	// ── Server ────────────────────────────────────────────────────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -301,10 +308,18 @@ func (s *smsSender) Send(ctx context.Context, to, msg string) error {
 
 }
 
+// fakeUploader saves PDFs to disk and serves them via the local server.
 type fakeUploader struct{}
 
-func (f *fakeUploader) Upload(_ context.Context, key string, _ []byte) (string, error) {
-	return "https://fake.spaces.example/" + key, nil
+func (f *fakeUploader) Upload(_ context.Context, key string, data []byte) (string, error) {
+	path := filepath.Join("tmp", "receipts", key)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return "", err
+	}
+	return "http://localhost:8080/dev/receipts/" + key, nil
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
