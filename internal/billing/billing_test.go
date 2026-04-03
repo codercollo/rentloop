@@ -60,7 +60,7 @@ func (m *mockNotifier) Send(_ context.Context, _, _ string) error {
 
 // ── STK methods required by BillingRepository ──────────────────────────────
 
-func (m *mockRepo) InsertSTKPush(_ context.Context, _, _ string, _ int) error {
+func (m *mockRepo) InsertSTKPush(_ context.Context, _, _, _ string, _ int) error {
 	return nil
 }
 
@@ -70,6 +70,18 @@ func (m *mockRepo) GetSTKRefByReceipt(_ context.Context, _ string) (string, erro
 }
 
 func (m *mockRepo) MarkSTKSuccess(_ context.Context, _, _ string) error {
+	return nil
+}
+
+func (m *mockRepo) SubscriptionPaymentExists(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockRepo) GetSTKRefByCheckoutID(_ context.Context, _ string) (string, error) {
+	return "RENTLOOP-ll-00000", nil
+}
+
+func (m *mockRepo) MarkSTKSuccessByCheckoutID(_ context.Context, _, _ string) error {
 	return nil
 }
 

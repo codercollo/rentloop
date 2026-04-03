@@ -31,6 +31,7 @@ import (
 	"github.com/codercollo/rentloop/internal/mpesa/stk"
 	"github.com/codercollo/rentloop/internal/notifier"
 	"github.com/codercollo/rentloop/internal/onboarding"
+	receiptpkg "github.com/codercollo/rentloop/internal/receipt"
 )
 
 func main() {
@@ -57,14 +58,40 @@ func main() {
 	ledgerRepo := ledger.NewRepository(pool)
 	botRepo := bot.NewRepository(pool)
 	depositRepo := deposits.NewRepository(pool)
+	receiptRepo := receiptpkg.NewRepository(pool)
 
 	// ── Core services ─────────────────────────────────────────────────────────
 	ledgerSvc := ledger.NewService(ledgerRepo)
 	matcherSvc := matcher.New(ledgerRepo)
 
-	// ── Deposit service ────────────────────────────────────────────────────────
-	// ledgerRepo satisfies deposits.UnitFetcher via GetUnitByRef.
+	// ── Deposit service ───────────────────────────────────────────────────────
 	depositSvc := deposits.NewService(depositRepo, ledgerRepo)
+
+	// ── Receipt service ───────────────────────────────────────────────────────
+	// receiptSvc := receiptpkg.NewService(receiptpkg.Config{
+	// 	SpacesKey:      cfg.DOSpacesKey,
+	// 	SpacesSecret:   cfg.DOSpacesSecret,
+	// 	SpacesBucket:   cfg.DOSpacesBucket,
+	// 	SpacesRegion:   cfg.DOSpacesRegion,
+	// 	SpacesEndpoint: cfg.DOSpacesEndpoint,
+	// }, receiptRepo)
+
+	// ── Receipt service ───────────────────────────────────────────────────────────
+	receiptCfg := receiptpkg.Config{
+		SpacesKey:      cfg.DOSpacesKey,
+		SpacesSecret:   cfg.DOSpacesSecret,
+		SpacesBucket:   cfg.DOSpacesBucket,
+		SpacesRegion:   cfg.DOSpacesRegion,
+		SpacesEndpoint: cfg.DOSpacesEndpoint,
+	}
+
+	var receiptSvc *receiptpkg.Service
+	if cfg.IsDevelopment() {
+		receiptSvc = receiptpkg.NewServiceWithUploader(receiptCfg, receiptRepo, &fakeUploader{})
+		slog.Info("receipt: using fake uploader (dev mode)")
+	} else {
+		receiptSvc = receiptpkg.NewService(receiptCfg, receiptRepo)
+	}
 
 	// ── Twilio — WhatsApp + SMS ───────────────────────────────────────────────
 	tw := notifier.NewTwilio(
@@ -76,7 +103,7 @@ func main() {
 
 	// ── Bot ───────────────────────────────────────────────────────────────────
 	botSvc := bot.NewService(botRepo, &waSender{tw}, tw)
-	botSvc.SetDeposits(depositSvc) // Phase 1: wire deposit service
+	botSvc.SetDeposits(depositSvc)
 	botHandler := bot.NewHandler(botSvc)
 	smsHandler := bot.NewSMSHandler(botSvc)
 
@@ -120,6 +147,7 @@ func main() {
 	defer c.Stop()
 
 	// ── M-Pesa ────────────────────────────────────────────────────────────────
+	// mpesaHandler must be declared BEFORE SetReceiptService is called.
 	mpesaHandler := mpesa.NewHandler(
 		matcherSvc,
 		ledgerSvc,
@@ -128,6 +156,7 @@ func main() {
 		billingHandler,
 		cfg.IsDevelopment(),
 	)
+	mpesaHandler.SetReceiptService(receiptSvc)
 
 	// ── Router ────────────────────────────────────────────────────────────────
 	r := chi.NewRouter()
@@ -140,7 +169,7 @@ func main() {
 		AllowedOrigins: []string{"https://rentloop.co.ke"},
 	}))
 
-	// ── Public ────────────────────────────────────────────────────────────────
+	// ── Public routes ─────────────────────────────────────────────────────────
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		tmpl.ExecuteTemplate(w, "landing.html", map[string]any{
 			"Year": time.Now().Year(),
@@ -169,13 +198,14 @@ func main() {
 	r.Handle("/static/*", http.StripPrefix("/static/",
 		http.FileServer(http.Dir("web/static"))))
 
-	// ── Webhooks ──────────────────────────────────────────────────────────────
+	// ── Webhooks (public — no auth required) ──────────────────────────────────
 	whatsappValidate := appMiddleware.ValidateTwilio(cfg.TwilioToken, cfg.WhatsAppWebhookURL, cfg.IsDevelopment())
 	smsValidate := appMiddleware.ValidateTwilio(cfg.TwilioToken, cfg.SMSWebhookURL, cfg.IsDevelopment())
 
 	r.With(appMiddleware.WhatsAppRateLimit, whatsappValidate).Post("/bot/whatsapp", botHandler.Inbound)
 	r.With(appMiddleware.SMSRateLimit, smsValidate).Post("/bot/sms", smsHandler.Inbound)
 	r.With(appMiddleware.MpesaRateLimit).Post("/mpesa/c2b/callback", mpesaHandler.Callback)
+	r.With(appMiddleware.MpesaRateLimit).Post("/mpesa/stk/callback", mpesaHandler.STKCallback)
 
 	// ── Admin auth — public ───────────────────────────────────────────────────
 	r.Get("/admin/login", authHandler.ShowLogin)
@@ -197,13 +227,16 @@ func main() {
 		r.Get("/admin/payments", adminHandler.Payments)
 		r.Get("/admin/payments/unmatched", adminHandler.UnmatchedPayments)
 
-		r.Post("/billing/stk", billingHandler.TriggerSTK)
-		r.With(appMiddleware.MpesaRateLimit).Post("/mpesa/stk/callback", mpesaHandler.STKCallback)
-
 		r.Get("/admin/payments/partial", func(w http.ResponseWriter, r *http.Request) {
 			payments, _ := adminRepo.GetRecentPayments(r.Context())
 			tmpl.ExecuteTemplate(w, "admin_payments_partial.html", payments)
 		})
+	})
+
+	// ── Internal — STK billing ────────────────────────────────────────────────
+	r.Group(func(r chi.Router) {
+		r.Use(appMiddleware.RequireInternal)
+		r.Post("/billing/stk", billingHandler.TriggerSTK)
 	})
 
 	// ── Server ────────────────────────────────────────────────────────────────
@@ -265,9 +298,16 @@ type smsSender struct{ tw *notifier.Twilio }
 
 func (s *smsSender) Send(ctx context.Context, to, msg string) error {
 	return s.tw.SendRawSMS(ctx, to, msg)
+
 }
 
-// ── Middleware ─────────────────────────────────────────────────────────────────
+type fakeUploader struct{}
+
+func (f *fakeUploader) Upload(_ context.Context, key string, _ []byte) (string, error) {
+	return "https://fake.spaces.example/" + key, nil
+}
+
+// ── Middleware ────────────────────────────────────────────────────────────────
 
 func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

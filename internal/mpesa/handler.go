@@ -11,6 +11,7 @@ import (
 
 	"github.com/codercollo/rentloop/internal/billing"
 	"github.com/codercollo/rentloop/internal/models"
+	"github.com/codercollo/rentloop/internal/receipt"
 )
 
 // MatcherService resolves an account reference to a unit.
@@ -36,12 +37,13 @@ type LandlordRepository interface {
 
 // Handler handles inbound Daraja C2B callbacks.
 type Handler struct {
-	matcher   MatcherService
-	ledger    LedgerService
-	notifier  NotifierService
-	landlords LandlordRepository
-	billing   *billing.Handler
-	isDev     bool
+	matcher    MatcherService
+	ledger     LedgerService
+	notifier   NotifierService
+	landlords  LandlordRepository
+	billing    *billing.Handler
+	receiptSvc *receipt.Service
+	isDev      bool
 }
 
 // NewHandler wires all dependencies. billing may be nil in tests.
@@ -63,6 +65,11 @@ func NewHandler(
 	}
 }
 
+// SetReceiptService setter
+func (h *Handler) SetReceiptService(svc *receipt.Service) {
+	h.receiptSvc = svc
+}
+
 // Callback handles POST /mpesa/c2b/callback.
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	if err := ValidateIP(r, h.isDev); err != nil {
@@ -80,7 +87,10 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	if err := ValidatePayload(&cb); err != nil {
 		slog.Warn("mpesa callback: invalid payload", "error", err, "trans_id", cb.TransID)
-		writeJSON(w, http.StatusUnprocessableEntity, C2BResponse{ResultCode: "1", ResultDesc: "Invalid payload"})
+		writeJSON(w, http.StatusUnprocessableEntity, C2BResponse{
+			ResultCode: "1",
+			ResultDesc: "Invalid payload",
+		})
 		return
 	}
 
@@ -96,6 +106,8 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	)
 
 	writeJSON(w, http.StatusOK, successResponse)
+
+	// ALL heavy work happens async
 	go h.process(cb, source)
 }
 
@@ -132,7 +144,7 @@ func (h *Handler) process(cb C2BCallback, source models.PaymentSource) {
 		return
 	}
 
-	// FIX 4: use premise_name (fully-qualified) for notifications, falling
+	// use premise_name (fully-qualified) for notifications, falling
 	// back to apartment_name. Previously landlord.ApartmentName was passed
 	// directly, which gave "Sunrise Apartments" instead of
 	// "Sunrise Apartments - Kitengela" — inconsistent with all bot responses.
@@ -198,6 +210,34 @@ func (h *Handler) process(cb C2BCallback, source models.PaymentSource) {
 		if err := h.notifier.NotifyTenant(ctx, cb.MSISDN, recorded, unit, notifyName); err != nil {
 			log.Error("process: tenant receipt failed", "error", err)
 		}
+	}
+
+	// ── Issue receipt (async) ────────────────────────────────────────────────
+	if h.receiptSvc != nil {
+		aptName := ""
+		if landlord != nil {
+			aptName = landlord.PremiseName
+			if aptName == "" {
+				aptName = landlord.ApartmentName
+			}
+		}
+
+		h.receiptSvc.IssueAsync(receipt.IssueInput{
+			Payment:       recorded,
+			Unit:          unit,
+			Landlord:      landlord,
+			ApartmentName: aptName,
+		}, func(result *receipt.IssueResult, err error) {
+			if err != nil {
+				slog.Error("receipt: issue failed",
+					"payment_id", recorded.ID, "error", err)
+				return
+			}
+			slog.Info("receipt: issued",
+				"receipt_number", result.Receipt.ReceiptNumber,
+				"url", result.PublicURL,
+			)
+		})
 	}
 }
 

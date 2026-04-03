@@ -1012,7 +1012,8 @@ func suspendedMsg(landlordID string) string {
 	if len(ref) > 8 {
 		ref = ref[:8]
 	}
-	return "*Suspended*\n\nYour RentLoop subscription has lapsed.\n" +
+	return "*Suspended*\n\n" +
+		"Your RentLoop subscription has lapsed.\n" +
 		"Reply *PAY* to renew via M-Pesa STK Push.\n\n" +
 		"Or pay manually: Paybill *400200* · Account *RENTLOOP-" + ref + "*"
 }
@@ -1042,5 +1043,6 @@ func helpText() string {
 		"*SET RENT <unit> 14000* — update rent amount\n" +
 		"*MARK <unit> PAID 12500 BANK* — log cash/bank payment\n" +
 		"*CLAIM TXN-ABC123 TO <unit>* — assign unmatched payment\n" +
-		"*BULK ADD* — upload tenants via CSV"
+		"*BULK ADD* — upload tenants via CSV\n" +
+		"*PAY* — renew subscription via M-Pesa STK Push"
 }
