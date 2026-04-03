@@ -13,8 +13,9 @@ import (
 // All fields are populated from environment variables.
 type Config struct {
 	// App
-	Port   string
-	AppEnv string // development | production
+	Port       string
+	AppEnv     string // development | production
+	AppVersion string
 
 	// Database
 	DatabaseURL string
@@ -68,8 +69,9 @@ type Config struct {
 // and returns a populated Config or an error.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port:   getEnv("PORT", "8080"),
-		AppEnv: getEnv("APP_ENV", "development"),
+		Port:       getEnv("PORT", "8080"),
+		AppEnv:     getEnv("APP_ENV", "development"),
+		AppVersion: getEnv("APP_VERSION", "dev"),
 
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 

@@ -36,6 +36,8 @@ import (
 )
 
 func main() {
+
+	startTime := time.Now()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	cfg, err := config.Load()
@@ -192,8 +194,18 @@ func main() {
 	})
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		// Verify DB is still reachable
+		dbStatus := "ok"
+		if err := pool.Ping(r.Context()); err != nil {
+			dbStatus = "degraded"
+		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"status":"ok"}`)
+		fmt.Fprintf(w, `{"status":"ok","version":"%s","env":"%s","db":"%s","uptime_s":%d}`,
+			cfg.AppVersion,
+			cfg.AppEnv,
+			dbStatus,
+			int64(time.Since(startTime).Seconds()),
+		)
 	})
 
 	r.Handle("/static/*", http.StripPrefix("/static/",
