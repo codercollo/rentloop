@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -35,6 +36,8 @@ import (
 )
 
 func main() {
+
+	startTime := time.Now()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	cfg, err := config.Load()
@@ -191,8 +194,18 @@ func main() {
 	})
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		// Verify DB is still reachable
+		dbStatus := "ok"
+		if err := pool.Ping(r.Context()); err != nil {
+			dbStatus = "degraded"
+		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"status":"ok"}`)
+		fmt.Fprintf(w, `{"status":"ok","version":"%s","env":"%s","db":"%s","uptime_s":%d}`,
+			cfg.AppVersion,
+			cfg.AppEnv,
+			dbStatus,
+			int64(time.Since(startTime).Seconds()),
+		)
 	})
 
 	r.Handle("/static/*", http.StripPrefix("/static/",
@@ -238,6 +251,12 @@ func main() {
 		r.Use(appMiddleware.RequireInternal)
 		r.Post("/billing/stk", billingHandler.TriggerSTK)
 	})
+
+	// Dev-only: serve locally saved receipt PDFs
+	if cfg.IsDevelopment() {
+		r.Handle("/dev/receipts/*",
+			http.StripPrefix("/dev/receipts/", http.FileServer(http.Dir("tmp/receipts"))))
+	}
 
 	// ── Server ────────────────────────────────────────────────────────────────
 	srv := &http.Server{
@@ -301,10 +320,18 @@ func (s *smsSender) Send(ctx context.Context, to, msg string) error {
 
 }
 
+// fakeUploader saves PDFs to disk and serves them via the local server.
 type fakeUploader struct{}
 
-func (f *fakeUploader) Upload(_ context.Context, key string, _ []byte) (string, error) {
-	return "https://fake.spaces.example/" + key, nil
+func (f *fakeUploader) Upload(_ context.Context, key string, data []byte) (string, error) {
+	path := filepath.Join("tmp", "receipts", key)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return "", err
+	}
+	return "http://localhost:8080/dev/receipts/" + key, nil
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────

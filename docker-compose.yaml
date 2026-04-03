@@ -1,0 +1,53 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RentLoop — Local development infrastructure
+#
+# Usage:
+#   docker-compose up -d          # start Postgres
+#   docker-compose down           # stop and remove containers
+#   docker-compose down -v        # also delete database volume
+#
+# The Go server itself is run with `make run` (not via Docker in dev).
+# This compose file only manages infrastructure dependencies.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: rentloop-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rentloop
+      POSTGRES_PASSWORD: rentloop
+      POSTGRES_DB: rentloop
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rentloop -d rentloop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Optional: pgAdmin for DB inspection in dev ─────────────────────────────
+  # Uncomment to enable. Access at http://localhost:5050
+  # Login: admin@rentloop.local / rentloop
+  #
+  # pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: rentloop-pgadmin
+  #   restart: unless-stopped
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@rentloop.local
+  #     PGADMIN_DEFAULT_PASSWORD: rentloop
+  #   ports:
+  #     - "5050:80"
+  #   depends_on:
+  #     - postgres
+
+volumes:
+  postgres_data:
+    driver: local
