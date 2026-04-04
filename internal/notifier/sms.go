@@ -88,14 +88,14 @@ func (s *SMS) SendOnboarding(ctx context.Context, phone, tenantName, unitRef, pa
 		msg = fmt.Sprintf(
 			"Hi %s, your landlord at %s uses RentLoop for rent. "+
 				"Pay KES %d monthly to Paybill %s, account: %s. "+
-				"You will receive a receipt instantly after payment.",
+				"You will receive a notification instantly after payment.",
 			tenantName, apartmentName, expectedRent, paybill, unitRef,
 		)
 	} else {
 		msg = fmt.Sprintf(
 			"Hi %s, your landlord uses RentLoop for rent. "+
 				"Pay KES %d monthly to Paybill %s, account: %s. "+
-				"You will receive a receipt instantly after payment.",
+				"You will receive a notification instantly after payment.",
 			tenantName, expectedRent, paybill, unitRef,
 		)
 	}
@@ -136,20 +136,19 @@ func buildTenantSMS(p *models.Payment, unit *models.Unit, apartmentName string) 
 	case models.PaymentStatusPaid:
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
-				"Rent paid in full. Receipt: #%s.",
+				"Rent paid in full. Message number: #%s.",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	case models.PaymentStatusOver:
-		// FIX 1 (parity): Added overpayment case to match buildTenantMessage.
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
-				"Rent paid in full (overpayment recorded). Receipt: #%s.",
+				"Rent paid in full (overpayment recorded). Message number: #%s.",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	case models.PaymentStatusPartial:
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
-				"Partial payment recorded. Receipt: #%s.",
+				"Partial payment recorded. Message number: #%s.",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	default:

@@ -175,7 +175,7 @@ func (t *Twilio) SendOnboarding(ctx context.Context, phone, tenantName, unitRef,
 		msg = fmt.Sprintf(
 			"Hi %s, your landlord uses RentLoop for rent. "+
 				"Pay KES %d monthly to Paybill %s, account: %s. "+
-				"You will receive a receipt instantly after payment.",
+				"You will receive a notification instantly after payment.",
 			tenantName, expectedRent, paybill, unitRef,
 		)
 	}
@@ -223,21 +223,19 @@ func buildTenantMessage(p *models.Payment, unit *models.Unit, apartmentName stri
 	case models.PaymentStatusPaid:
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
-				"Rent paid in full. Receipt: #%s.",
+				"Rent paid in full.\nMessage number: #%s",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	case models.PaymentStatusOver:
-		// FIX 1: overpayment case was missing — fell through to default.
-		// Tenant now gets a clear message showing the overpaid amount.
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
-				"Rent paid in full (overpayment recorded). Receipt: #%s.",
+				"Rent paid in full (overpayment recorded).\nMessage number: #%s",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	case models.PaymentStatusPartial:
 		return fmt.Sprintf(
 			"%s: KES %d received for Unit %s on %s. "+
-				"Partial payment recorded. Receipt: #%s.",
+				"Partial payment recorded.\nMessage number: #%s",
 			property, p.Amount, unit.UnitRef, ts, shortID(p.ID),
 		)
 	default:

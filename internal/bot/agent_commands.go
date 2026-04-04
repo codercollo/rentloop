@@ -64,23 +64,16 @@ func (s *Service) handleAgent(ctx context.Context, from, upper string, a *models
 			response = s.agentCmdReceipt(ctx, a, name, unitRef)
 		}
 
-	case "HISTORY":
-		if len(parts) < 3 {
-			response = "Usage: HISTORY <landlord name> <unit>\nExample: HISTORY Wanjiku A1"
-		} else {
-			unitRef := parts[len(parts)-1]
-			name := strings.Join(parts[1:len(parts)-1], " ")
-			response = s.agentCmdHistory(ctx, a, name, unitRef)
-		}
-
-	case "HISTORY-EXT":
-		if len(parts) >= 2 && strings.ToUpper(parts[1]) == "ALL" {
+	case "ANNUAL":
+		if len(parts) < 2 || strings.ToUpper(parts[1]) != "HISTORY" {
+			response = "Usage: ANNUAL HISTORY <landlord name> <unit> or ANNUAL HISTORY ALL\nExample: ANNUAL HISTORY Wanjiku A1"
+		} else if len(parts) >= 3 && strings.ToUpper(parts[2]) == "ALL" {
 			response = s.agentCmdHistoryExtAll(ctx, a)
-		} else if len(parts) < 3 {
-			response = "Usage: HISTORY-EXT <landlord name> <unit> or HISTORY-EXT ALL\nExample: HISTORY-EXT Wanjiku A1"
+		} else if len(parts) < 4 {
+			response = "Usage: ANNUAL HISTORY <landlord name> <unit> or ANNUAL HISTORY ALL\nExample: ANNUAL HISTORY Wanjiku A1"
 		} else {
 			unitRef := parts[len(parts)-1]
-			name := strings.Join(parts[1:len(parts)-1], " ")
+			name := strings.Join(parts[2:len(parts)-1], " ")
 			response = s.agentCmdHistoryExt(ctx, a, name, unitRef)
 		}
 
@@ -417,6 +410,9 @@ func (s *Service) agentCmdTotalAll(ctx context.Context, a *models.Agent) string 
 	month := time.Now().Format("January 2006")
 
 	var grandCollected, grandExpected int
+	var grandOverpaid, grandShortfall int
+	var grandOverpaidUnits, grandShortfallUnits int
+
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*Portfolio — Rent — %s*\n", month)
 
@@ -431,37 +427,73 @@ func (s *Service) agentCmdTotalAll(ctx context.Context, a *models.Agent) string 
 			continue
 		}
 
-		var collected, expected, overdue int
+		var collected, expected int
+		var overpaidAmt, shortfallAmt int
+		var overpaidUnits, shortfallUnits, partialUnits int
+
 		for _, u := range units {
 			expected += u.Unit.ExpectedRent
 			collected += u.TotalPaid
-			if !u.IsPaid {
-				overdue++
+
+			switch {
+			case u.TotalPaid > u.Unit.ExpectedRent:
+				overpaidAmt += u.TotalPaid - u.Unit.ExpectedRent
+				overpaidUnits++
+			case u.TotalPaid > 0 && u.TotalPaid < u.Unit.ExpectedRent:
+				shortfallAmt += u.Unit.ExpectedRent - u.TotalPaid
+				partialUnits++
+			case u.TotalPaid == 0:
+				shortfallUnits++
 			}
 		}
+
 		grandCollected += collected
 		grandExpected += expected
+		grandOverpaid += overpaidAmt
+		grandShortfall += shortfallAmt
+		grandOverpaidUnits += overpaidUnits
+		grandShortfallUnits += partialUnits + shortfallUnits
 
 		label := apartmentLabel(l)
 		icon := portfolioIcon(collected, expected)
 		fmt.Fprintf(sb, "\n%s *%s*\n", icon, label)
 		fmt.Fprintf(sb, "  Collected: KES %s / KES %s",
 			formatAmount(collected), formatAmount(expected))
-		if overdue > 0 {
-			fmt.Fprintf(sb, "\n  ⚠ %d unit(s) overdue", overdue)
+
+		overdueCount := shortfallUnits + partialUnits
+		if overdueCount > 0 {
+			fmt.Fprintf(sb, "\n  ⚠ %d unit(s) overdue", overdueCount)
 		}
 	}
 
-	grandBalance := grandExpected - grandCollected
+	if grandExpected == 0 {
+		return "No active units found across your portfolio."
+	}
+
 	fmt.Fprintf(sb, "\n\n───────────────\n")
 	fmt.Fprintf(sb, "*Grand total — rent*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(grandCollected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(grandExpected))
-	if grandBalance > 0 {
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(grandBalance))
-	} else {
-		fmt.Fprintf(sb, "Balance:   fully collected ✓")
+
+	if grandOverpaid > 0 {
+		fmt.Fprintf(sb, "Overpaid:  KES %s across %d unit(s) \n",
+			formatAmount(grandOverpaid), grandOverpaidUnits)
 	}
+	if grandShortfall > 0 {
+		fmt.Fprintf(sb, "Shortfall: KES %s across %d unit(s) \n",
+			formatAmount(grandShortfall), grandShortfallUnits)
+	}
+
+	net := grandExpected - grandCollected
+	switch {
+	case net < 0:
+		fmt.Fprintf(sb, "Net:       KES %s above expected ✓", formatAmount(-net))
+	case net == 0:
+		fmt.Fprintf(sb, "Net:       fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Net:       KES %s outstanding", formatAmount(net))
+	}
+
 	return sb.String()
 }
 
@@ -486,27 +518,52 @@ func (s *Service) agentCmdTotal(ctx context.Context, a *models.Agent, name strin
 	}
 
 	var collected, expected int
+	var overpaidAmt, shortfallAmt int
+	var overpaidUnits, shortfallUnits, partialUnits int
+
 	for _, u := range units {
 		expected += u.Unit.ExpectedRent
 		collected += u.TotalPaid
+
+		switch {
+		case u.TotalPaid > u.Unit.ExpectedRent:
+			overpaidAmt += u.TotalPaid - u.Unit.ExpectedRent
+			overpaidUnits++
+		case u.TotalPaid > 0 && u.TotalPaid < u.Unit.ExpectedRent:
+			shortfallAmt += u.Unit.ExpectedRent - u.TotalPaid
+			partialUnits++
+		case u.TotalPaid == 0:
+			shortfallUnits++
+		}
 	}
 
 	month := time.Now().Format("January 2006")
-	balance := expected - collected
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*%s — %s*\n", apartmentLabel(landlord), month)
 
-	// ── Rent section ──────────────────────────────────────────────────────────
 	fmt.Fprintf(sb, "\n*Rent collected*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(collected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(expected))
-	if balance > 0 {
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(balance))
-	} else {
-		fmt.Fprintf(sb, "Balance:   fully collected ✓")
+
+	if overpaidAmt > 0 {
+		fmt.Fprintf(sb, "Overpaid:  KES %s across %d unit(s) ⬆\n",
+			formatAmount(overpaidAmt), overpaidUnits)
+	}
+	if shortfallAmt > 0 {
+		fmt.Fprintf(sb, "Shortfall: KES %s across %d unit(s) ⚠\n",
+			formatAmount(shortfallAmt), partialUnits+shortfallUnits)
 	}
 
-	// ── Deposit section — hard separator ─────────────────────────────────────
+	netBalance := expected - collected
+	switch {
+	case netBalance < 0:
+		fmt.Fprintf(sb, "Net:       KES %s above expected ✓", formatAmount(-netBalance))
+	case netBalance == 0:
+		fmt.Fprintf(sb, "Net:       fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Net:       KES %s outstanding", formatAmount(netBalance))
+	}
+
 	if s.deposits != nil {
 		var totalHeld, totalOutstanding int
 		for _, u := range units {
@@ -656,7 +713,7 @@ func (s *Service) agentCmdHistory(ctx context.Context, a *models.Agent, name, ra
 	}
 
 	if outstandingTotal > 0 {
-		fmt.Fprintf(sb, "\n\nReply *HISTORY-EXT %s %s* for the full 12-month view.", landlord.Name, unit.UnitRef)
+		fmt.Fprintf(sb, "\n\nReply *ANNUAL HISTORY %s %s* for the full 12-month view.", landlord.Name, unit.UnitRef)
 	}
 
 	return sb.String()
@@ -1154,8 +1211,8 @@ func agentHelpText() string {
 		"*TOTAL Wanjiku* — rent total for one landlord (deposits shown separately)\n" +
 		"*RECEIPT Wanjiku A1* — receipt for a unit this month\n" +
 		"*HISTORY Wanjiku A1* — last 3 months with arrears summary\n" +
-		"*HISTORY-EXT Wanjiku A1* — 12-month history with arrears\n" +
-		"*HISTORY-EXT ALL* — full portfolio 12-month history\n" +
+		"*ANNUAL HISTORY Wanjiku A1* — 12-month history with arrears\n" +
+		"*ANNUAL HISTORY ALL* — full portfolio 12-month history\n" +
 		"*LANDLORD-HISTORY Wanjiku* — 12-month portfolio performance\n" +
 		"*DEPOSIT Wanjiku A1* — deposit for one unit\n" +
 		"*DEPOSIT STATUS ALL* — all deposits across portfolio\n" +
