@@ -32,7 +32,6 @@ import (
 	"github.com/codercollo/rentloop/internal/mpesa/stk"
 	"github.com/codercollo/rentloop/internal/notifier"
 	"github.com/codercollo/rentloop/internal/onboarding"
-	receiptpkg "github.com/codercollo/rentloop/internal/receipt"
 )
 
 func main() {
@@ -61,7 +60,6 @@ func main() {
 	ledgerRepo := ledger.NewRepository(pool)
 	botRepo := bot.NewRepository(pool)
 	depositRepo := deposits.NewRepository(pool)
-	receiptRepo := receiptpkg.NewRepository(pool)
 
 	// ── Core services ─────────────────────────────────────────────────────────
 	ledgerSvc := ledger.NewService(ledgerRepo)
@@ -78,23 +76,6 @@ func main() {
 	// 	SpacesRegion:   cfg.DOSpacesRegion,
 	// 	SpacesEndpoint: cfg.DOSpacesEndpoint,
 	// }, receiptRepo)
-
-	// ── Receipt service ───────────────────────────────────────────────────────────
-	receiptCfg := receiptpkg.Config{
-		SpacesKey:      cfg.DOSpacesKey,
-		SpacesSecret:   cfg.DOSpacesSecret,
-		SpacesBucket:   cfg.DOSpacesBucket,
-		SpacesRegion:   cfg.DOSpacesRegion,
-		SpacesEndpoint: cfg.DOSpacesEndpoint,
-	}
-
-	var receiptSvc *receiptpkg.Service
-	if cfg.IsDevelopment() {
-		receiptSvc = receiptpkg.NewServiceWithUploader(receiptCfg, receiptRepo, &fakeUploader{})
-		slog.Info("receipt: using fake uploader (dev mode)")
-	} else {
-		receiptSvc = receiptpkg.NewService(receiptCfg, receiptRepo)
-	}
 
 	// ── Twilio — WhatsApp + SMS ───────────────────────────────────────────────
 	tw := notifier.NewTwilio(
@@ -159,7 +140,6 @@ func main() {
 		billingHandler,
 		cfg.IsDevelopment(),
 	)
-	mpesaHandler.SetReceiptService(receiptSvc)
 
 	// ── Router ────────────────────────────────────────────────────────────────
 	r := chi.NewRouter()
@@ -251,12 +231,6 @@ func main() {
 		r.Use(appMiddleware.RequireInternal)
 		r.Post("/billing/stk", billingHandler.TriggerSTK)
 	})
-
-	// Dev-only: serve locally saved receipt PDFs
-	if cfg.IsDevelopment() {
-		r.Handle("/dev/receipts/*",
-			http.StripPrefix("/dev/receipts/", http.FileServer(http.Dir("tmp/receipts"))))
-	}
 
 	// ── Server ────────────────────────────────────────────────────────────────
 	srv := &http.Server{
