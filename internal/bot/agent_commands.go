@@ -64,23 +64,16 @@ func (s *Service) handleAgent(ctx context.Context, from, upper string, a *models
 			response = s.agentCmdReceipt(ctx, a, name, unitRef)
 		}
 
-	case "HISTORY":
-		if len(parts) < 3 {
-			response = "Usage: HISTORY <landlord name> <unit>\nExample: HISTORY Wanjiku A1"
-		} else {
-			unitRef := parts[len(parts)-1]
-			name := strings.Join(parts[1:len(parts)-1], " ")
-			response = s.agentCmdHistory(ctx, a, name, unitRef)
-		}
-
-	case "HISTORY-EXT":
-		if len(parts) >= 2 && strings.ToUpper(parts[1]) == "ALL" {
+	case "ANNUAL":
+		if len(parts) < 2 || strings.ToUpper(parts[1]) != "HISTORY" {
+			response = "Usage: ANNUAL HISTORY <landlord name> <unit> or ANNUAL HISTORY ALL\nExample: ANNUAL HISTORY Wanjiku A1"
+		} else if len(parts) >= 3 && strings.ToUpper(parts[2]) == "ALL" {
 			response = s.agentCmdHistoryExtAll(ctx, a)
-		} else if len(parts) < 3 {
-			response = "Usage: HISTORY-EXT <landlord name> <unit> or HISTORY-EXT ALL\nExample: HISTORY-EXT Wanjiku A1"
+		} else if len(parts) < 4 {
+			response = "Usage: ANNUAL HISTORY <landlord name> <unit> or ANNUAL HISTORY ALL\nExample: ANNUAL HISTORY Wanjiku A1"
 		} else {
 			unitRef := parts[len(parts)-1]
-			name := strings.Join(parts[1:len(parts)-1], " ")
+			name := strings.Join(parts[2:len(parts)-1], " ")
 			response = s.agentCmdHistoryExt(ctx, a, name, unitRef)
 		}
 
@@ -452,15 +445,19 @@ func (s *Service) agentCmdTotalAll(ctx context.Context, a *models.Agent) string 
 		}
 	}
 
-	grandBalance := grandExpected - grandCollected
 	fmt.Fprintf(sb, "\n\n───────────────\n")
 	fmt.Fprintf(sb, "*Grand total — rent*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(grandCollected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(grandExpected))
-	if grandBalance > 0 {
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(grandBalance))
-	} else {
+	switch {
+	case grandCollected > grandExpected:
+		grandOverpaid := grandCollected - grandExpected
+		fmt.Fprintf(sb, "Balance:   fully collected ✓\n")
+		fmt.Fprintf(sb, "Overpaid:  KES %s above expected", formatAmount(grandOverpaid))
+	case grandCollected == grandExpected:
 		fmt.Fprintf(sb, "Balance:   fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(grandExpected-grandCollected))
 	}
 	return sb.String()
 }
@@ -492,18 +489,21 @@ func (s *Service) agentCmdTotal(ctx context.Context, a *models.Agent, name strin
 	}
 
 	month := time.Now().Format("January 2006")
-	balance := expected - collected
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*%s — %s*\n", apartmentLabel(landlord), month)
 
-	// ── Rent section ──────────────────────────────────────────────────────────
 	fmt.Fprintf(sb, "\n*Rent collected*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(collected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(expected))
-	if balance > 0 {
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(balance))
-	} else {
+	switch {
+	case collected > expected:
+		overpaid := collected - expected
+		fmt.Fprintf(sb, "Balance:   fully collected ✓\n")
+		fmt.Fprintf(sb, "Overpaid:  KES %s above expected", formatAmount(overpaid))
+	case collected == expected:
 		fmt.Fprintf(sb, "Balance:   fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(expected-collected))
 	}
 
 	// ── Deposit section — hard separator ─────────────────────────────────────
@@ -656,7 +656,7 @@ func (s *Service) agentCmdHistory(ctx context.Context, a *models.Agent, name, ra
 	}
 
 	if outstandingTotal > 0 {
-		fmt.Fprintf(sb, "\n\nReply *HISTORY-EXT %s %s* for the full 12-month view.", landlord.Name, unit.UnitRef)
+		fmt.Fprintf(sb, "\n\nReply *ANNUAL HISTORY %s %s* for the full 12-month view.", landlord.Name, unit.UnitRef)
 	}
 
 	return sb.String()
@@ -1154,8 +1154,8 @@ func agentHelpText() string {
 		"*TOTAL Wanjiku* — rent total for one landlord (deposits shown separately)\n" +
 		"*RECEIPT Wanjiku A1* — receipt for a unit this month\n" +
 		"*HISTORY Wanjiku A1* — last 3 months with arrears summary\n" +
-		"*HISTORY-EXT Wanjiku A1* — 12-month history with arrears\n" +
-		"*HISTORY-EXT ALL* — full portfolio 12-month history\n" +
+		"*ANNUAL HISTORY Wanjiku A1* — 12-month history with arrears\n" +
+		"*ANNUAL HISTORY ALL* — full portfolio 12-month history\n" +
 		"*LANDLORD-HISTORY Wanjiku* — 12-month portfolio performance\n" +
 		"*DEPOSIT Wanjiku A1* — deposit for one unit\n" +
 		"*DEPOSIT STATUS ALL* — all deposits across portfolio\n" +

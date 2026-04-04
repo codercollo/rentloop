@@ -58,11 +58,11 @@ func (s *Service) handleLandlord(ctx context.Context, upper string, l *models.La
 			return "Usage: HISTORY <unit>\nExample: HISTORY A1"
 		}
 		return s.cmdHistory(ctx, l, parts[1])
-	case "HISTORY-EXT":
-		if len(parts) < 2 {
-			return "Usage: HISTORY-EXT <unit>\nExample: HISTORY-EXT A1"
+	case "ANNUAL":
+		if len(parts) < 3 || strings.ToUpper(parts[1]) != "HISTORY" {
+			return "Usage: ANNUAL HISTORY <unit>\nExample: ANNUAL HISTORY A1"
 		}
-		return s.cmdHistoryExt(ctx, l, parts[1])
+		return s.cmdHistoryExt(ctx, l, parts[2])
 	case "LANDLORD-HISTORY":
 		return s.cmdLandlordHistory(ctx, l)
 	case "DEPOSIT":
@@ -70,9 +70,9 @@ func (s *Service) handleLandlord(ctx context.Context, upper string, l *models.La
 			return "Usage: DEPOSIT <unit>\nExample: DEPOSIT A1"
 		}
 		return s.cmdDeposit(ctx, l, parts[1])
-	case "DEPOSIT-RECEIVE":
+	case "DEPOSIT-RECEIVED":
 		if len(parts) < 3 {
-			return "Usage: DEPOSIT-RECEIVE <unit> <amount>\nExample: DEPOSIT-RECEIVE A1 15000"
+			return "Usage: DEPOSIT-RECEIVED <unit> <amount>\nExample: DEPOSIT-RECEIVED A1 15000"
 		}
 		note := ""
 		if len(parts) > 3 {
@@ -242,7 +242,6 @@ func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 	}
 
 	month := time.Now().Format("January 2006")
-	balance := expected - collected
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*%s — %s*\n", apartmentLabel(l), month)
 
@@ -250,10 +249,15 @@ func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 	fmt.Fprintf(sb, "\n*Rent collected*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(collected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(expected))
-	if balance > 0 {
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(balance))
-	} else {
+	switch {
+	case collected > expected:
+		overpaid := collected - expected
+		fmt.Fprintf(sb, "Balance:   fully collected ✓\n")
+		fmt.Fprintf(sb, "Overpaid:  KES %s above expected", formatAmount(overpaid))
+	case collected == expected:
 		fmt.Fprintf(sb, "Balance:   fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(expected-collected))
 	}
 
 	// ── Deposit section — hard separator so rent and deposit never mix ────────
@@ -408,7 +412,7 @@ func (s *Service) cmdHistory(ctx context.Context, l *models.Landlord, rawRef str
 
 	// ── Prompt to act if arrears are present ─────────────────────────────────
 	if outstandingTotal > 0 {
-		fmt.Fprintf(sb, "\n\nReply *HISTORY-EXT %s* for the full 12-month view.", unit.UnitRef)
+		fmt.Fprintf(sb, "\n\nReply *ANNUAL HISTORY %s* for the full 12-month view.", unit.UnitRef)
 	}
 
 	return sb.String()
@@ -627,7 +631,7 @@ func (s *Service) cmdDeposit(ctx context.Context, l *models.Landlord, rawRef str
 	}
 
 	fmt.Fprintf(sb, "\n*Reply:*\n")
-	fmt.Fprintf(sb, "• DEPOSIT-RECEIVE %s <amount>\n", unit.UnitRef)
+	fmt.Fprintf(sb, "• DEPOSIT-RECEIVED %s <amount>\n", unit.UnitRef)
 	fmt.Fprintf(sb, "• DEPOSIT-REFUND %s <amount>", unit.UnitRef)
 
 	return sb.String()
@@ -641,7 +645,7 @@ func (s *Service) cmdDepositReceive(ctx context.Context, l *models.Landlord, raw
 	ref := normaliseRef(rawRef)
 	amount := parseRent(amountStr)
 	if amount <= 0 {
-		return fmt.Sprintf("Invalid amount: %s\nUsage: DEPOSIT-RECEIVE <unit> <amount>", amountStr)
+		return fmt.Sprintf("Invalid amount: %s\nUsage: DEPOSIT-RECEIVED <unit> <amount>", amountStr)
 	}
 
 	result, err := s.deposits.Receive(ctx, l.ID, ref, amount, note, "landlord")
@@ -929,7 +933,7 @@ func (s *Service) cmdClaim(ctx context.Context, l *models.Landlord, parts []stri
 	}
 
 	return fmt.Sprintf(
-		"Payment assigned.\nKES %s → Unit %s (%s)\nTransaction: %s",
+		"Payment of KES %s assigned to Unit %s (%s)\nTransaction: %s",
 		formatAmount(payment.Amount), unit.UnitRef, unit.TenantName, transID,
 	)
 }
@@ -1029,14 +1033,14 @@ func eatLocation() *time.Location {
 func helpText() string {
 	return "*RentLoop Commands*\n\n" +
 		"*LIST* — paid vs unpaid this month\n" +
-		"*REMIND* — nudge all unpaid tenants\n" +
+		"*REMIND* — reminders to all unpaid tenants\n" +
 		"*TOTAL* — rent collected vs expected (deposits shown separately)\n" +
 		"*RECEIPT <unit>* — receipt for a unit this month\n" +
 		"*HISTORY <unit>* — last 3 months with arrears summary\n" +
-		"*HISTORY-EXT <unit>* — full 12-month history with arrears\n" +
+		"*ANNUAL HISTORY <unit>* — full 12-month history with arrears\n" +
 		"*LANDLORD-HISTORY* — 12-month portfolio overview\n" +
 		"*DEPOSIT <unit>* — deposit balance for a unit\n" +
-		"*DEPOSIT-RECEIVE <unit> 15000* — record deposit received\n" +
+		"*DEPOSIT-RECEIVED <unit> 15000* — record deposit received\n" +
 		"*DEPOSIT-REFUND <unit> 12000* — record deposit refund\n" +
 		"*ADD UNIT <unit> John 0712345678 12500* — add a unit\n" +
 		"*REPLACE <unit> Grace Auma 0745678901 12500* — swap tenant\n" +
