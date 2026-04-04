@@ -236,31 +236,52 @@ func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 	}
 
 	var collected, expected int
+	var overpaidAmt, shortfallAmt int
+	var overpaidUnits, shortfallUnits, partialUnits int
+
 	for _, u := range units {
 		expected += u.Unit.ExpectedRent
 		collected += u.TotalPaid
+
+		switch {
+		case u.TotalPaid > u.Unit.ExpectedRent:
+			overpaidAmt += u.TotalPaid - u.Unit.ExpectedRent
+			overpaidUnits++
+		case u.TotalPaid > 0 && u.TotalPaid < u.Unit.ExpectedRent:
+			shortfallAmt += u.Unit.ExpectedRent - u.TotalPaid
+			partialUnits++
+		case u.TotalPaid == 0:
+			shortfallUnits++
+		}
 	}
 
 	month := time.Now().Format("January 2006")
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*%s — %s*\n", apartmentLabel(l), month)
 
-	// ── Rent section ──────────────────────────────────────────────────────────
 	fmt.Fprintf(sb, "\n*Rent collected*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(collected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(expected))
-	switch {
-	case collected > expected:
-		overpaid := collected - expected
-		fmt.Fprintf(sb, "Balance:   fully collected ✓\n")
-		fmt.Fprintf(sb, "Overpaid:  KES %s above expected", formatAmount(overpaid))
-	case collected == expected:
-		fmt.Fprintf(sb, "Balance:   fully collected ✓")
-	default:
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(expected-collected))
+
+	if overpaidAmt > 0 {
+		fmt.Fprintf(sb, "Overpaid:  KES %s across %d unit(s) \n",
+			formatAmount(overpaidAmt), overpaidUnits)
+	}
+	if shortfallAmt > 0 {
+		fmt.Fprintf(sb, "Shortfall: KES %s across %d unit(s) \n",
+			formatAmount(shortfallAmt), partialUnits+shortfallUnits)
 	}
 
-	// ── Deposit section — hard separator so rent and deposit never mix ────────
+	netBalance := expected - collected
+	switch {
+	case netBalance < 0:
+		fmt.Fprintf(sb, "Net:       KES %s above expected ✓", formatAmount(-netBalance))
+	case netBalance == 0:
+		fmt.Fprintf(sb, "Net:       fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Net:       KES %s outstanding", formatAmount(netBalance))
+	}
+
 	if s.deposits != nil {
 		var totalHeld, totalOutstanding int
 		for _, u := range units {
@@ -276,7 +297,6 @@ func (s *Service) cmdTotal(ctx context.Context, l *models.Landlord) string {
 			totalHeld += d.DepositPaid - d.DepositRefunded
 		}
 		if totalHeld > 0 || totalOutstanding > 0 {
-			// Hard rule — makes it impossible to confuse deposit with rent totals.
 			fmt.Fprintf(sb, "\n\n───────────────\n")
 			fmt.Fprintf(sb, "*Security deposits*\n")
 			fmt.Fprintf(sb, "Held:        KES %s", formatAmount(totalHeld))

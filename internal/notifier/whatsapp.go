@@ -120,7 +120,7 @@ func buildLandlordMessage(p *models.Payment, unit *models.Unit, apartmentName st
 			"%s (Unit %s) paid KES %d\n"+
 			"Status: %s\n"+
 			"Time: %s\n"+
-			"Receipt: #%s",
+			"Message number: #%s",
 		property,
 		statusEmoji(p.Status),
 		unit.TenantName, unit.UnitRef, p.Amount,

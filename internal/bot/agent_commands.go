@@ -410,6 +410,9 @@ func (s *Service) agentCmdTotalAll(ctx context.Context, a *models.Agent) string 
 	month := time.Now().Format("January 2006")
 
 	var grandCollected, grandExpected int
+	var grandOverpaid, grandShortfall int
+	var grandOverpaidUnits, grandShortfallUnits int
+
 	sb := &strings.Builder{}
 	fmt.Fprintf(sb, "*Portfolio — Rent — %s*\n", month)
 
@@ -424,41 +427,73 @@ func (s *Service) agentCmdTotalAll(ctx context.Context, a *models.Agent) string 
 			continue
 		}
 
-		var collected, expected, overdue int
+		var collected, expected int
+		var overpaidAmt, shortfallAmt int
+		var overpaidUnits, shortfallUnits, partialUnits int
+
 		for _, u := range units {
 			expected += u.Unit.ExpectedRent
 			collected += u.TotalPaid
-			if !u.IsPaid {
-				overdue++
+
+			switch {
+			case u.TotalPaid > u.Unit.ExpectedRent:
+				overpaidAmt += u.TotalPaid - u.Unit.ExpectedRent
+				overpaidUnits++
+			case u.TotalPaid > 0 && u.TotalPaid < u.Unit.ExpectedRent:
+				shortfallAmt += u.Unit.ExpectedRent - u.TotalPaid
+				partialUnits++
+			case u.TotalPaid == 0:
+				shortfallUnits++
 			}
 		}
+
 		grandCollected += collected
 		grandExpected += expected
+		grandOverpaid += overpaidAmt
+		grandShortfall += shortfallAmt
+		grandOverpaidUnits += overpaidUnits
+		grandShortfallUnits += partialUnits + shortfallUnits
 
 		label := apartmentLabel(l)
 		icon := portfolioIcon(collected, expected)
 		fmt.Fprintf(sb, "\n%s *%s*\n", icon, label)
 		fmt.Fprintf(sb, "  Collected: KES %s / KES %s",
 			formatAmount(collected), formatAmount(expected))
-		if overdue > 0 {
-			fmt.Fprintf(sb, "\n  ⚠ %d unit(s) overdue", overdue)
+
+		overdueCount := shortfallUnits + partialUnits
+		if overdueCount > 0 {
+			fmt.Fprintf(sb, "\n  ⚠ %d unit(s) overdue", overdueCount)
 		}
+	}
+
+	if grandExpected == 0 {
+		return "No active units found across your portfolio."
 	}
 
 	fmt.Fprintf(sb, "\n\n───────────────\n")
 	fmt.Fprintf(sb, "*Grand total — rent*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(grandCollected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(grandExpected))
-	switch {
-	case grandCollected > grandExpected:
-		grandOverpaid := grandCollected - grandExpected
-		fmt.Fprintf(sb, "Balance:   fully collected ✓\n")
-		fmt.Fprintf(sb, "Overpaid:  KES %s above expected", formatAmount(grandOverpaid))
-	case grandCollected == grandExpected:
-		fmt.Fprintf(sb, "Balance:   fully collected ✓")
-	default:
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(grandExpected-grandCollected))
+
+	if grandOverpaid > 0 {
+		fmt.Fprintf(sb, "Overpaid:  KES %s across %d unit(s) \n",
+			formatAmount(grandOverpaid), grandOverpaidUnits)
 	}
+	if grandShortfall > 0 {
+		fmt.Fprintf(sb, "Shortfall: KES %s across %d unit(s) \n",
+			formatAmount(grandShortfall), grandShortfallUnits)
+	}
+
+	net := grandExpected - grandCollected
+	switch {
+	case net < 0:
+		fmt.Fprintf(sb, "Net:       KES %s above expected ✓", formatAmount(-net))
+	case net == 0:
+		fmt.Fprintf(sb, "Net:       fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Net:       KES %s outstanding", formatAmount(net))
+	}
+
 	return sb.String()
 }
 
@@ -483,9 +518,23 @@ func (s *Service) agentCmdTotal(ctx context.Context, a *models.Agent, name strin
 	}
 
 	var collected, expected int
+	var overpaidAmt, shortfallAmt int
+	var overpaidUnits, shortfallUnits, partialUnits int
+
 	for _, u := range units {
 		expected += u.Unit.ExpectedRent
 		collected += u.TotalPaid
+
+		switch {
+		case u.TotalPaid > u.Unit.ExpectedRent:
+			overpaidAmt += u.TotalPaid - u.Unit.ExpectedRent
+			overpaidUnits++
+		case u.TotalPaid > 0 && u.TotalPaid < u.Unit.ExpectedRent:
+			shortfallAmt += u.Unit.ExpectedRent - u.TotalPaid
+			partialUnits++
+		case u.TotalPaid == 0:
+			shortfallUnits++
+		}
 	}
 
 	month := time.Now().Format("January 2006")
@@ -495,18 +544,26 @@ func (s *Service) agentCmdTotal(ctx context.Context, a *models.Agent, name strin
 	fmt.Fprintf(sb, "\n*Rent collected*\n")
 	fmt.Fprintf(sb, "Collected: KES %s\n", formatAmount(collected))
 	fmt.Fprintf(sb, "Expected:  KES %s\n", formatAmount(expected))
-	switch {
-	case collected > expected:
-		overpaid := collected - expected
-		fmt.Fprintf(sb, "Balance:   fully collected ✓\n")
-		fmt.Fprintf(sb, "Overpaid:  KES %s above expected", formatAmount(overpaid))
-	case collected == expected:
-		fmt.Fprintf(sb, "Balance:   fully collected ✓")
-	default:
-		fmt.Fprintf(sb, "Balance:   KES %s outstanding", formatAmount(expected-collected))
+
+	if overpaidAmt > 0 {
+		fmt.Fprintf(sb, "Overpaid:  KES %s across %d unit(s) ⬆\n",
+			formatAmount(overpaidAmt), overpaidUnits)
+	}
+	if shortfallAmt > 0 {
+		fmt.Fprintf(sb, "Shortfall: KES %s across %d unit(s) ⚠\n",
+			formatAmount(shortfallAmt), partialUnits+shortfallUnits)
 	}
 
-	// ── Deposit section — hard separator ─────────────────────────────────────
+	netBalance := expected - collected
+	switch {
+	case netBalance < 0:
+		fmt.Fprintf(sb, "Net:       KES %s above expected ✓", formatAmount(-netBalance))
+	case netBalance == 0:
+		fmt.Fprintf(sb, "Net:       fully collected ✓")
+	default:
+		fmt.Fprintf(sb, "Net:       KES %s outstanding", formatAmount(netBalance))
+	}
+
 	if s.deposits != nil {
 		var totalHeld, totalOutstanding int
 		for _, u := range units {

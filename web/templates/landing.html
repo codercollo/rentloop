@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>RentLoop — Automated Paybill Rent Reconciliation for Kenya</title>
-
     <style>
       *,
       *::before,
@@ -40,53 +39,39 @@
         overflow-x: hidden;
       }
 
-      /* ─── Nav ─── */
+      /* ─── NAV ─── */
       nav {
         position: fixed;
         top: 0;
         width: 100%;
         z-index: 100;
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(16px) saturate(180%);
-        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        background: rgba(255, 255, 255, 0.95);
         border-bottom: 1px solid var(--border);
         padding: 0 2rem;
-        height: 64px;
+        height: 60px;
         display: flex;
         align-items: center;
         justify-content: space-between;
       }
       .nav-logo {
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         font-weight: 800;
         color: var(--green);
         letter-spacing: -0.02em;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.4rem;
       }
       .nav-logo-dot {
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         background: var(--green);
         border-radius: 50%;
-        animation: pulse-dot 2s ease infinite;
-      }
-      @keyframes pulse-dot {
-        0%,
-        100% {
-          opacity: 1;
-          transform: scale(1);
-        }
-        50% {
-          opacity: 0.55;
-          transform: scale(0.8);
-        }
       }
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 2rem;
+        gap: 1.75rem;
       }
       .nav-links a {
         font-size: 0.875rem;
@@ -101,44 +86,75 @@
       .btn-nav {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
-        padding: 0.55rem 1.2rem;
+        padding: 0.5rem 1.1rem;
         background: var(--green);
         color: #fff;
         border-radius: 8px;
-        font-size: 0.875rem;
+        font-size: 0.85rem;
         font-weight: 600;
         text-decoration: none;
-        transition: all 0.15s;
+        transition: background 0.15s;
       }
       .btn-nav:hover {
         background: var(--green-dark);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 14px rgba(0, 165, 80, 0.25);
       }
 
-      /* ─── Hero ─── */
+      /* Hamburger */
+      .nav-mobile-toggle {
+        display: none;
+        flex-direction: column;
+        gap: 5px;
+        cursor: pointer;
+        padding: 4px;
+        background: none;
+        border: none;
+      }
+      .nav-mobile-toggle span {
+        display: block;
+        width: 22px;
+        height: 2px;
+        background: var(--text);
+        border-radius: 2px;
+        transition: all 0.2s;
+      }
+      .mobile-menu {
+        display: none;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        background: var(--white);
+        border-bottom: 1px solid var(--border);
+        padding: 1.25rem 2rem;
+        flex-direction: column;
+        gap: 1rem;
+        z-index: 99;
+      }
+      .mobile-menu.open {
+        display: flex;
+      }
+      .mobile-menu a {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--text);
+        text-decoration: none;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .mobile-menu a:last-child {
+        border-bottom: none;
+      }
+      .mobile-menu .btn-nav {
+        align-self: flex-start;
+        margin-top: 0.25rem;
+      }
+
+      /* ─── HERO ─── */
       .hero {
-        padding: 128px 2rem 72px;
-        max-width: 720px;
+        padding: 120px 2rem 64px;
+        max-width: 700px;
         margin: 0 auto;
         text-align: center;
-        position: relative;
-      }
-      .hero::before {
-        content: "";
-        position: absolute;
-        top: 60px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 600px;
-        height: 400px;
-        background: radial-gradient(
-          ellipse at center,
-          rgba(0, 165, 80, 0.07) 0%,
-          transparent 70%
-        );
-        pointer-events: none;
       }
       .hero-badge {
         display: inline-flex;
@@ -152,17 +168,15 @@
         color: var(--green-dark);
         font-weight: 600;
         margin-bottom: 1.75rem;
-        letter-spacing: 0.02em;
       }
       .badge-dot {
         width: 6px;
         height: 6px;
         background: var(--green);
         border-radius: 50%;
-        animation: pulse-dot 2s ease infinite;
       }
       .hero h1 {
-        font-size: clamp(2.4rem, 5.5vw, 3.75rem);
+        font-size: clamp(2.2rem, 5.5vw, 3.6rem);
         font-weight: 800;
         line-height: 1.1;
         letter-spacing: -0.04em;
@@ -174,23 +188,23 @@
         color: var(--green);
       }
       .hero-kingline {
-        font-size: 1.05rem;
+        font-size: 1rem;
         font-weight: 700;
         color: var(--text);
         background: var(--green-light);
         border-left: 3px solid var(--green);
-        padding: 0.65rem 1.1rem;
+        padding: 0.6rem 1rem;
         border-radius: 0 8px 8px 0;
         display: inline-block;
         margin-bottom: 1.5rem;
         text-align: left;
       }
       .hero p {
-        font-size: 1.05rem;
+        font-size: 1rem;
         color: var(--muted);
         line-height: 1.75;
-        margin-bottom: 2.25rem;
-        max-width: 500px;
+        margin-bottom: 2rem;
+        max-width: 480px;
         margin-left: auto;
         margin-right: auto;
         font-weight: 300;
@@ -205,50 +219,47 @@
       .btn-hero {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.9rem 1.85rem;
+        gap: 0.4rem;
+        padding: 0.85rem 1.75rem;
         background: var(--green);
         color: #fff;
         border-radius: 10px;
         font-size: 1rem;
         font-weight: 600;
         text-decoration: none;
-        transition: all 0.15s;
-        box-shadow:
-          0 2px 0 var(--green-dark),
-          0 8px 24px rgba(0, 165, 80, 0.2);
+        transition:
+          background 0.15s,
+          transform 0.15s;
+        box-shadow: 0 2px 0 var(--green-dark);
       }
       .btn-hero:hover {
         background: var(--green-dark);
-        transform: translateY(-2px);
-        box-shadow:
-          0 4px 0 var(--green-xdark),
-          0 12px 32px rgba(0, 165, 80, 0.3);
+        transform: translateY(-1px);
       }
       .btn-hero-ghost {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
-        padding: 0.9rem 1.85rem;
+        padding: 0.85rem 1.75rem;
         border: 1.5px solid var(--border);
         color: var(--text);
         border-radius: 10px;
         font-size: 1rem;
         font-weight: 500;
         text-decoration: none;
-        transition: all 0.15s;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
       }
       .btn-hero-ghost:hover {
         border-color: var(--green);
         color: var(--green);
-        background: var(--green-light);
       }
       .hero-note {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         color: var(--muted-light);
       }
 
-      /* ─── Stats ─── */
+      /* ─── STATS ─── */
       .stats-bar {
         border-top: 1px solid var(--border);
         border-bottom: 1px solid var(--border);
@@ -258,12 +269,9 @@
       .stats-inner {
         max-width: 760px;
         margin: 0 auto;
-        display: flex;
-        justify-content: space-around;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
         gap: 1rem;
-      }
-      .stat {
         text-align: center;
       }
       .stat-number {
@@ -273,69 +281,83 @@
         letter-spacing: -0.03em;
       }
       .stat-label {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         color: var(--muted);
         margin-top: 0.1rem;
+        line-height: 1.4;
       }
 
-      /* ─── Problem section ─── */
+      /* ─── TRUST ─── */
+      .trust-strip {
+        background: var(--text);
+        padding: 1rem 2rem;
+        overflow-x: auto;
+      }
+      .trust-inner {
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
+        flex-wrap: wrap;
+      }
+      .trust-item {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.55);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .trust-item strong {
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .trust-sep {
+        width: 1px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      /* ─── SECTION COMMON ─── */
+      .section-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--green);
+        margin-bottom: 0.55rem;
+        display: block;
+      }
+      .section-title {
+        font-size: clamp(1.5rem, 3vw, 2rem);
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.65rem;
+        line-height: 1.2;
+      }
+      .section-sub {
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.7;
+        font-weight: 300;
+      }
+
+      /* ─── PROBLEM ─── */
       .problem-section {
-        padding: 5.5rem 2rem;
+        padding: 5rem 2rem;
         max-width: 900px;
         margin: 0 auto;
       }
       .problem-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 3rem;
-        margin-top: 2.75rem;
-        align-items: start;
-      }
-      .problem-list {
-        list-style: none;
-        display: flex;
-        flex-direction: column;
-        gap: 0.9rem;
-      }
-      .problem-list li {
-        display: flex;
-        gap: 0.75rem;
-        align-items: flex-start;
-        font-size: 0.92rem;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-      .problem-list li::before {
-        content: "✗";
-        color: #dc2626;
-        font-weight: 700;
-        flex-shrink: 0;
-        margin-top: 0.05rem;
-      }
-      .solution-list {
-        list-style: none;
-        display: flex;
-        flex-direction: column;
-        gap: 0.9rem;
-      }
-      .solution-list li {
-        display: flex;
-        gap: 0.75rem;
-        align-items: flex-start;
-        font-size: 0.92rem;
-        color: var(--text);
-        line-height: 1.6;
-        font-weight: 500;
-      }
-      .solution-list li::before {
-        content: "✓";
-        color: var(--green);
-        font-weight: 700;
-        flex-shrink: 0;
-        margin-top: 0.05rem;
+        gap: 2.5rem;
+        margin-top: 2.5rem;
       }
       .problem-col-label {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 700;
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -348,84 +370,59 @@
       .problem-col-label.after {
         color: var(--green);
       }
-      .problem-divider {
-        width: 1px;
-        background: var(--border);
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 50%;
-      }
-
-      /* ─── Trust strip ─── */
-      .trust-strip {
-        background: var(--text);
-        padding: 1.1rem 2rem;
-      }
-      .trust-inner {
-        max-width: 900px;
-        margin: 0 auto;
+      .problem-list,
+      .solution-list {
+        list-style: none;
         display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 2.5rem;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 0.85rem;
       }
-      .trust-item {
+      .problem-list li,
+      .solution-list li {
         display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.6);
+        gap: 0.65rem;
+        align-items: flex-start;
+        font-size: 0.9rem;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .problem-list li::before {
+        content: "✗";
+        color: #dc2626;
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+      }
+      .solution-list li::before {
+        content: "✓";
+        color: var(--green);
+        font-weight: 700;
+        flex-shrink: 0;
+        margin-top: 0.05rem;
+      }
+      .solution-list li {
+        color: var(--text);
         font-weight: 500;
       }
-      .trust-item strong {
-        color: rgba(255, 255, 255, 0.9);
-      }
-      .trust-sep {
-        width: 1px;
-        height: 18px;
-        background: rgba(255, 255, 255, 0.15);
-      }
 
-      /* ─── Demo ─── */
+      /* ─── DEMO ─── */
       .demo-section {
         background: var(--surface);
         padding: 5rem 2rem;
-        position: relative;
-        overflow: hidden;
-      }
-      .demo-section::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background:
-          radial-gradient(
-            circle at 15% 50%,
-            rgba(0, 165, 80, 0.04) 0%,
-            transparent 50%
-          ),
-          radial-gradient(
-            circle at 85% 50%,
-            rgba(0, 165, 80, 0.04) 0%,
-            transparent 50%
-          );
-        pointer-events: none;
       }
       .demo-inner {
-        max-width: 420px;
+        max-width: 400px;
         margin: 0 auto;
-        position: relative;
       }
       .demo-header {
         text-align: center;
         margin-bottom: 2rem;
       }
       .demo-header h2 {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
         font-weight: 700;
         letter-spacing: -0.03em;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.4rem;
       }
       .demo-header p {
         font-size: 0.875rem;
@@ -434,53 +431,53 @@
 
       .phone-shell {
         background: #1c1c1e;
-        border-radius: 40px;
-        padding: 10px;
+        border-radius: 38px;
+        padding: 9px;
         box-shadow:
-          0 40px 100px rgba(0, 0, 0, 0.22),
+          0 32px 80px rgba(0, 0, 0, 0.2),
           0 0 0 1px rgba(255, 255, 255, 0.06);
       }
       .phone-screen {
         background: #fff;
-        border-radius: 32px;
+        border-radius: 30px;
         overflow: hidden;
       }
       .phone-status {
         background: #075e54;
-        padding: 0.65rem 1rem 0.5rem;
+        padding: 0.6rem 1rem 0.45rem;
         display: flex;
         align-items: center;
-        gap: 0.65rem;
+        gap: 0.6rem;
       }
       .phone-avatar {
-        width: 36px;
-        height: 36px;
+        width: 34px;
+        height: 34px;
         border-radius: 50%;
         background: var(--green);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.68rem;
+        font-size: 0.65rem;
         font-weight: 800;
         color: #fff;
         flex-shrink: 0;
       }
       .phone-contact-name {
-        font-size: 0.875rem;
+        font-size: 0.85rem;
         font-weight: 600;
         color: #fff;
       }
       .phone-contact-status {
-        font-size: 0.68rem;
-        color: rgba(255, 255, 255, 0.65);
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.6);
         margin-top: 1px;
       }
       .phone-icons {
         margin-left: auto;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 1rem;
         display: flex;
-        gap: 0.8rem;
-        color: rgba(255, 255, 255, 0.75);
-        font-size: 1.05rem;
+        gap: 0.7rem;
       }
 
       .chat-bg {
@@ -489,8 +486,8 @@
         padding: 1rem 0.85rem;
         display: flex;
         flex-direction: column;
-        gap: 0.65rem;
-        min-height: 420px;
+        gap: 0.6rem;
+        min-height: 400px;
       }
       .msg-row {
         display: flex;
@@ -508,16 +505,16 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 0.52rem;
+        font-size: 0.5rem;
         font-weight: 800;
         color: #fff;
         flex-shrink: 0;
       }
       .msg {
         max-width: 82%;
-        padding: 0.6rem 0.85rem;
+        padding: 0.55rem 0.8rem;
         border-radius: 10px;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         line-height: 1.55;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
       }
@@ -541,7 +538,7 @@
         color: #b45309;
       }
       .msg .t {
-        font-size: 0.62rem;
+        font-size: 0.6rem;
         color: #aaa;
         display: block;
         text-align: right;
@@ -550,14 +547,14 @@
       .msg .hint {
         color: #25d366;
         font-weight: 600;
-        font-size: 0.73rem;
+        font-size: 0.72rem;
         display: block;
         margin-top: 0.25rem;
       }
       .msg .arrears {
         color: #dc2626;
         font-weight: 600;
-        font-size: 0.73rem;
+        font-size: 0.72rem;
         display: block;
         margin-top: 0.2rem;
       }
@@ -565,7 +562,7 @@
         display: flex;
         gap: 3px;
         align-items: center;
-        padding: 0.5rem 0.75rem;
+        padding: 0.45rem 0.7rem;
         background: #fff;
         border-radius: 10px;
         width: fit-content;
@@ -574,7 +571,7 @@
       .td {
         width: 6px;
         height: 6px;
-        background: #aaa;
+        background: #bbb;
         border-radius: 50%;
         animation: td 1.2s ease infinite;
       }
@@ -597,136 +594,86 @@
         }
       }
 
-      /* ─── How it works ─── */
+      /* ─── HOW IT WORKS ─── */
       .how-section {
-        padding: 6rem 2rem;
+        padding: 5.5rem 2rem;
         max-width: 900px;
         margin: 0 auto;
       }
-      .section-label {
-        font-size: 0.72rem;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--green);
-        margin-bottom: 0.6rem;
-        display: block;
-      }
-      .section-title {
-        font-size: clamp(1.6rem, 3vw, 2.1rem);
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        margin-bottom: 0.75rem;
-        line-height: 1.2;
-      }
-      .section-sub {
-        color: var(--muted);
-        font-size: 1rem;
-        line-height: 1.7;
-        font-weight: 300;
-      }
-
       .payment-methods {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.6rem;
-        margin-top: 1.5rem;
-        margin-bottom: 2.75rem;
+        gap: 0.5rem;
+        margin-top: 1.25rem;
+        margin-bottom: 2.5rem;
       }
       .pay-pill {
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
-        padding: 0.4rem 0.9rem;
+        padding: 0.35rem 0.85rem;
         background: var(--green-light);
         border: 1px solid var(--green-mid);
         border-radius: 999px;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 600;
         color: var(--green-dark);
       }
-
       .how-steps {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 1.25rem;
-        position: relative;
-      }
-      .how-steps::before {
-        content: "";
-        position: absolute;
-        top: 26px;
-        left: calc(16.67% + 18px);
-        right: calc(16.67% + 18px);
-        height: 1px;
-        background: var(--green-mid);
-        pointer-events: none;
       }
       .step-card {
-        background: #fff;
+        background: var(--white);
         border: 1px solid var(--border);
         border-radius: 14px;
         padding: 1.5rem;
-        transition: all 0.2s;
+        transition:
+          box-shadow 0.2s,
+          border-color 0.2s,
+          transform 0.2s;
       }
       .step-card:hover {
-        box-shadow: 0 8px 32px rgba(0, 165, 80, 0.1);
+        box-shadow: 0 6px 24px rgba(0, 165, 80, 0.09);
         border-color: var(--green-mid);
         transform: translateY(-2px);
       }
       .step-num {
-        width: 36px;
-        height: 36px;
+        width: 34px;
+        height: 34px;
         background: var(--green);
         color: #fff;
-        border-radius: 10px;
+        border-radius: 9px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
-        font-size: 0.9rem;
-        margin-bottom: 1.1rem;
+        font-size: 0.88rem;
+        margin-bottom: 1rem;
       }
       .step-card h3 {
         font-weight: 700;
-        font-size: 0.95rem;
-        margin-bottom: 0.5rem;
+        font-size: 0.92rem;
+        margin-bottom: 0.45rem;
       }
       .step-card p {
-        font-size: 0.845rem;
+        font-size: 0.84rem;
         color: var(--muted);
         line-height: 1.65;
       }
 
-      /* ─── Commands ─── */
+      /* ─── COMMANDS ─── */
       .commands-section {
         background: var(--text);
         padding: 5.5rem 2rem;
-        position: relative;
-        overflow: hidden;
-      }
-      .commands-section::before {
-        content: "";
-        position: absolute;
-        top: -40%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 800px;
-        height: 800px;
-        background: radial-gradient(
-          circle,
-          rgba(0, 165, 80, 0.08) 0%,
-          transparent 60%
-        );
-        pointer-events: none;
       }
       .commands-inner {
         max-width: 760px;
         margin: 0 auto;
-        position: relative;
       }
       .commands-header {
-        margin-bottom: 2.75rem;
+        margin-bottom: 2.5rem;
       }
       .commands-header .section-label {
         color: var(--green);
@@ -735,12 +682,12 @@
         color: #fff;
       }
       .commands-header .section-sub {
-        color: rgba(255, 255, 255, 0.45);
+        color: rgba(255, 255, 255, 0.42);
       }
 
       .cmd-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: 0.5rem;
         margin-bottom: 1rem;
       }
@@ -748,151 +695,150 @@
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.07);
         border-radius: 10px;
-        padding: 0.9rem 1.1rem;
+        padding: 0.9rem 1rem;
         display: grid;
         grid-template-columns: auto 1fr;
-        gap: 0 1rem;
+        gap: 0 0.9rem;
         align-items: start;
-        transition: all 0.15s;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
       }
       .cmd-card:hover {
         background: rgba(0, 165, 80, 0.08);
-        border-color: rgba(0, 165, 80, 0.25);
+        border-color: rgba(0, 165, 80, 0.22);
       }
       .cmd-code {
         font-family: ui-monospace, "SF Mono", Menlo, monospace;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 700;
         color: var(--green);
         white-space: nowrap;
-        letter-spacing: 0.02em;
         padding-top: 1px;
       }
       .cmd-desc {
         font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(255, 255, 255, 0.55);
         line-height: 1.5;
       }
       .cmd-more {
         margin-top: 1.25rem;
-        padding: 0.9rem 1.1rem;
+        padding: 0.85rem 1rem;
         background: rgba(0, 165, 80, 0.06);
-        border: 1px solid rgba(0, 165, 80, 0.15);
+        border: 1px solid rgba(0, 165, 80, 0.14);
         border-radius: 10px;
-        font-size: 0.82rem;
-        color: rgba(255, 255, 255, 0.45);
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.42);
       }
       .cmd-more strong {
         color: var(--green);
       }
       .cmd-note {
-        margin-top: 1.75rem;
-        padding: 1.1rem 1.35rem;
-        background: rgba(0, 165, 80, 0.08);
-        border: 1px solid rgba(0, 165, 80, 0.2);
+        margin-top: 1.5rem;
+        padding: 1rem 1.25rem;
+        background: rgba(0, 165, 80, 0.07);
+        border: 1px solid rgba(0, 165, 80, 0.18);
         border-radius: 10px;
-        font-size: 0.82rem;
-        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.45);
         line-height: 1.65;
       }
       .cmd-note strong {
         color: var(--green);
       }
 
-      /* ─── Pricing ─── */
+      /* ─── PRICING ─── */
       .pricing-section {
         padding: 6rem 2rem;
         max-width: 760px;
         margin: 0 auto;
       }
       .pricing-header {
-        margin-bottom: 2.75rem;
+        margin-bottom: 2.5rem;
       }
       .pricing-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1.25rem;
       }
-      @media (max-width: 540px) {
-        .pricing-grid {
-          grid-template-columns: 1fr;
-        }
-      }
       .price-card {
         border: 1.5px solid var(--border);
         border-radius: 16px;
-        padding: 2rem;
-        transition: all 0.2s;
+        padding: 1.85rem;
+        transition:
+          box-shadow 0.2s,
+          transform 0.2s;
       }
       .price-card:hover {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 6px 28px rgba(0, 0, 0, 0.06);
         transform: translateY(-2px);
       }
       .price-card.featured {
         border-color: var(--green);
-        background: linear-gradient(135deg, var(--green-light) 0%, #fff 100%);
+        background: var(--green-light);
         position: relative;
       }
       .feat-badge {
         position: absolute;
-        top: -12px;
+        top: -11px;
         left: 50%;
         transform: translateX(-50%);
         background: var(--green);
         color: #fff;
-        font-size: 0.68rem;
+        font-size: 0.66rem;
         font-weight: 700;
         letter-spacing: 0.05em;
         text-transform: uppercase;
-        padding: 0.3rem 0.85rem;
+        padding: 0.28rem 0.8rem;
         border-radius: 999px;
+        white-space: nowrap;
       }
       .price-tier {
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--green);
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.65rem;
       }
       .price-amt {
-        font-size: 2.5rem;
+        font-size: 2.3rem;
         font-weight: 800;
         letter-spacing: -0.04em;
         margin-bottom: 0.2rem;
       }
       .price-amt span {
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         font-weight: 400;
         color: var(--muted);
         letter-spacing: 0;
       }
       .price-sub {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         color: var(--muted);
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.35rem;
       }
       .price-sub-note {
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         color: var(--green-dark);
         font-weight: 600;
-        margin-bottom: 1.25rem;
+        margin-bottom: 1.1rem;
       }
       .price-div {
         height: 1px;
         background: var(--border);
-        margin-bottom: 1.25rem;
+        margin-bottom: 1.1rem;
       }
       .price-features {
         list-style: none;
         display: flex;
         flex-direction: column;
-        gap: 0.65rem;
+        gap: 0.6rem;
       }
       .price-features li {
         display: flex;
-        gap: 0.6rem;
-        font-size: 0.845rem;
+        gap: 0.55rem;
+        font-size: 0.84rem;
         align-items: flex-start;
       }
       .price-features li::before {
@@ -905,8 +851,8 @@
       .pricing-note {
         text-align: center;
         color: var(--muted);
-        font-size: 0.82rem;
-        margin-top: 1.75rem;
+        font-size: 0.8rem;
+        margin-top: 1.5rem;
         line-height: 1.6;
       }
       .pricing-note strong {
@@ -916,69 +862,51 @@
       /* ─── CTA ─── */
       .cta-section {
         background: var(--green);
-        padding: 5.5rem 2rem;
+        padding: 5rem 2rem;
         text-align: center;
-        position: relative;
-        overflow: hidden;
-      }
-      .cta-section::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background:
-          radial-gradient(
-            circle at 20% 50%,
-            rgba(255, 255, 255, 0.06) 0%,
-            transparent 50%
-          ),
-          radial-gradient(
-            circle at 80% 50%,
-            rgba(255, 255, 255, 0.06) 0%,
-            transparent 50%
-          );
-        pointer-events: none;
       }
       .cta-inner {
-        position: relative;
-        max-width: 520px;
+        max-width: 500px;
         margin: 0 auto;
       }
       .cta-section h2 {
-        font-size: clamp(1.75rem, 4vw, 2.5rem);
+        font-size: clamp(1.6rem, 4vw, 2.25rem);
         font-weight: 800;
         color: #fff;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.65rem;
         letter-spacing: -0.03em;
-        line-height: 1.15;
+        line-height: 1.2;
       }
       .cta-section p {
         color: rgba(255, 255, 255, 0.75);
-        margin-bottom: 2.25rem;
+        margin-bottom: 2rem;
         font-size: 1rem;
         line-height: 1.6;
       }
       .btn-white {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 1rem 2.25rem;
+        gap: 0.4rem;
+        padding: 0.95rem 2rem;
         background: #fff;
         color: var(--green);
-        border-radius: 12px;
+        border-radius: 10px;
         font-weight: 700;
         text-decoration: none;
         font-size: 1rem;
-        transition: all 0.15s;
-        box-shadow: 0 4px 0 rgba(0, 0, 0, 0.12);
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+        box-shadow: 0 3px 0 rgba(0, 0, 0, 0.1);
       }
       .btn-white:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.1);
+        box-shadow: 0 6px 0 rgba(0, 0, 0, 0.08);
       }
 
-      /* ─── Footer ─── */
+      /* ─── FOOTER ─── */
       footer {
-        padding: 1.75rem 2rem;
+        padding: 1.5rem 2rem;
         border-top: 1px solid var(--border);
         display: flex;
         align-items: center;
@@ -992,15 +920,16 @@
         color: var(--green);
       }
       .footer-text {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         color: var(--muted-light);
       }
       .footer-links {
         display: flex;
         gap: 1.5rem;
+        flex-wrap: wrap;
       }
       .footer-links a {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         color: var(--muted);
         text-decoration: none;
         transition: color 0.15s;
@@ -1009,45 +938,10 @@
         color: var(--text);
       }
 
-      /* ─── Responsive ─── */
-      @media (max-width: 680px) {
-        nav {
-          padding: 0 1.25rem;
-        }
-        .nav-links a:not(.btn-nav) {
-          display: none;
-        }
-        .hero {
-          padding: 100px 1.25rem 56px;
-        }
-        .how-steps {
-          grid-template-columns: 1fr;
-        }
-        .how-steps::before {
-          display: none;
-        }
-        .problem-grid {
-          grid-template-columns: 1fr;
-        }
-        .cmd-grid {
-          grid-template-columns: 1fr;
-        }
-        footer {
-          flex-direction: column;
-          text-align: center;
-        }
-        .footer-links {
-          justify-content: center;
-        }
-        .trust-sep {
-          display: none;
-        }
-      }
-
-      /* ─── Scroll animations ─── */
+      /* ─── ANIMATIONS ─── */
       .fade-up {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(18px);
         transition:
           opacity 0.5s ease,
           transform 0.5s ease;
@@ -1056,12 +950,157 @@
         opacity: 1;
         transform: translateY(0);
       }
+
+      /* ─── RESPONSIVE ─── */
+
+      /* Tablet: 680px – 900px */
+      @media (max-width: 900px) {
+        .problem-grid {
+          gap: 2rem;
+        }
+        .how-steps {
+          grid-template-columns: 1fr 1fr;
+        }
+        .cmd-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Phablet / large phone: up to 680px */
+      @media (max-width: 680px) {
+        nav {
+          padding: 0 1.25rem;
+        }
+        .nav-links a:not(.btn-nav) {
+          display: none;
+        }
+        .nav-mobile-toggle {
+          display: flex;
+        }
+        .btn-nav.desktop-only {
+          display: none;
+        }
+
+        .hero {
+          padding: 88px 1.25rem 48px;
+        }
+        .hero h1 {
+          font-size: 2rem;
+        }
+        .hero-kingline {
+          font-size: 0.9rem;
+        }
+
+        .stats-inner {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .trust-inner {
+          gap: 1rem;
+          justify-content: flex-start;
+        }
+        .trust-sep {
+          display: none;
+        }
+
+        .problem-section {
+          padding: 3.5rem 1.25rem;
+        }
+        .problem-grid {
+          grid-template-columns: 1fr;
+          gap: 1.75rem;
+        }
+
+        .demo-section {
+          padding: 3.5rem 1.25rem;
+        }
+
+        .how-section {
+          padding: 4rem 1.25rem;
+        }
+        .how-steps {
+          grid-template-columns: 1fr;
+        }
+
+        .commands-section {
+          padding: 4rem 1.25rem;
+        }
+        .cmd-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .pricing-section {
+          padding: 4rem 1.25rem;
+        }
+        .pricing-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .cta-section {
+          padding: 3.5rem 1.25rem;
+        }
+
+        footer {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .footer-links {
+          justify-content: flex-start;
+          gap: 1rem;
+        }
+      }
+
+      /* Small phone: up to 400px */
+      @media (max-width: 400px) {
+        .hero h1 {
+          font-size: 1.75rem;
+        }
+        .btn-hero,
+        .btn-hero-ghost {
+          padding: 0.75rem 1.25rem;
+          font-size: 0.92rem;
+        }
+        .stats-inner {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.75rem;
+        }
+        .stat-number {
+          font-size: 1.3rem;
+        }
+        .price-amt {
+          font-size: 2rem;
+        }
+      }
+
+      /* Large screens: 1200px+ */
+      @media (min-width: 1200px) {
+        .hero {
+          max-width: 800px;
+        }
+        .problem-section {
+          max-width: 1000px;
+        }
+        .how-section {
+          max-width: 1000px;
+        }
+        .commands-inner {
+          max-width: 900px;
+        }
+        .pricing-section {
+          max-width: 860px;
+        }
+        .how-steps {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .cmd-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
     </style>
   </head>
   <body>
     <!-- Nav -->
     <nav>
-      <span class="nav-logo">>RentLoop </span>
+      <span class="nav-logo"> <span class="nav-logo-dot"></span>RentLoop </span>
       <div class="nav-links">
         <a href="#problem">Why RentLoop</a>
         <a href="#how">How it works</a>
@@ -1070,31 +1109,48 @@
         <a
           href="https://wa.me/254700000000?text=JOIN"
           target="_blank"
-          class="btn-nav"
+          class="btn-nav desktop-only"
           >Get started free →</a
         >
       </div>
+      <button
+        class="nav-mobile-toggle"
+        aria-label="Menu"
+        onclick="toggleMenu()"
+      >
+        <span></span><span></span><span></span>
+      </button>
     </nav>
+
+    <!-- Mobile menu -->
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#problem" onclick="closeMenu()">Why RentLoop</a>
+      <a href="#how" onclick="closeMenu()">How it works</a>
+      <a href="#commands" onclick="closeMenu()">Commands</a>
+      <a href="#pricing" onclick="closeMenu()">Pricing</a>
+      <a
+        href="https://wa.me/254700000000?text=JOIN"
+        target="_blank"
+        class="btn-nav"
+        >Get started free →</a
+      >
+    </div>
 
     <!-- Hero -->
     <section class="hero">
       <div class="hero-badge">
-        <span class="badge-dot"></span>Live in Kenya Works with your existing
+        <span class="badge-dot"></span>Live in Kenya · Works with your existing
         Paybill
       </div>
-
       <h1>Rent tracking, done automatically<br /><em>for your Paybill.</em></h1>
-
       <div class="hero-kingline">
         No more checking statements to confirm rent.
       </div>
-
       <p>
         Tenants keep paying your Paybill as usual. RentLoop links each payment
-        to the right unit, logs it, and sends you a WhatsApp alert instantly
+        to the right unit, logs it, and sends you a WhatsApp alert instantly —
         everything handled automatically.
       </p>
-
       <div class="hero-actions">
         <a
           href="https://wa.me/254700000000?text=JOIN"
@@ -1104,7 +1160,6 @@
         >
         <a href="#problem" class="btn-hero-ghost">See how it works</a>
       </div>
-
       <p class="hero-note">
         Free for up to 3 units · No app to install · Works with your existing
         Paybill
@@ -1152,7 +1207,7 @@
       </div>
     </div>
 
-    <!-- Problem section -->
+    <!-- Problem -->
     <section id="problem">
       <div class="problem-section fade-up">
         <span class="section-label">Why landlords struggle with Paybill</span>
@@ -1161,7 +1216,6 @@
           Paybill is powerful. But the bank statement doesn't show you which
           unit paid. That's where hours disappear every month.
         </p>
-
         <div class="problem-grid">
           <div>
             <span class="problem-col-label before">Before RentLoop</span>
@@ -1179,11 +1233,13 @@
             <span class="problem-col-label after">With RentLoop</span>
             <ul class="solution-list">
               <li>Payment matched to unit the moment it lands</li>
-              <li>WhatsApp notification within 3 seconds unit, name, amount</li>
+              <li>
+                WhatsApp notification within 3 seconds — unit, name, amount
+              </li>
               <li>Mismatched references claimed with one command</li>
               <li>Zero manual reconciliation ever</li>
               <li>Ledger updated automatically, every payment</li>
-              <li>Type LIST see exactly who's paid right now</li>
+              <li>Type LIST — see exactly who's paid right now</li>
               <li>Partial payments and arrears tracked automatically</li>
             </ul>
           </div>
@@ -1227,7 +1283,7 @@
                   Peter Njoroge (Unit E1) paid
                   <span class="amt">KES 10,000</span><br />
                   <span class="warn"
-                    >KES 2,000 outstanding partial payment</span
+                    >KES 2,000 outstanding — partial payment</span
                   >
                   <span class="arrears"
                     >↳ Arrears carried forward: KES 1,500</span
@@ -1259,8 +1315,8 @@
               <div class="msg-row">
                 <div class="msg-av">RL</div>
                 <div class="msg in">
-                  Sent reminders to <b>4 tenants</b> (2 unpaid · 2
-                  partial).<span class="t">18:01 ✓✓</span>
+                  Sent reminders to <b>4 tenants</b> (2 unpaid · 2 partial).
+                  <span class="t">18:01 ✓✓</span>
                 </div>
               </div>
               <div class="msg-row">
@@ -1302,7 +1358,7 @@
             <p>
               Tenant sends rent to your existing Paybill using their unit
               reference (e.g. <strong>4B</strong>) as the account number.
-              Nothing changes for them M-Pesa, agent, bank, or ATM.
+              Nothing changes for them — M-Pesa, agent, bank, or ATM.
             </p>
           </div>
           <div class="step-card">
@@ -1320,8 +1376,7 @@
             <p>
               You get notified instantly. Type <strong>LIST</strong> to see
               who's paid. Type <strong>REMIND</strong> to nudge everyone who
-              hasn't. Type <strong>TOTAL</strong> for the full picture. No
-              login. No URL.
+              hasn't. Type <strong>TOTAL</strong> for the full picture.
             </p>
           </div>
         </div>
@@ -1336,11 +1391,9 @@
           <h2 class="section-title">Everything from one message</h2>
           <p class="section-sub">
             Send any command in capitals to your RentLoop number. No login. No
-            URL. No app. Works with automatic Paybill reconciliation in the
-            background.
+            URL. No app.
           </p>
         </div>
-
         <div class="cmd-grid">
           <div class="cmd-card">
             <span class="cmd-code">LIST</span>
@@ -1385,14 +1438,12 @@
             </div>
           </div>
         </div>
-
         <div class="cmd-more">
           <strong>15+ commands available after you join</strong> — including ADD
           UNIT, REPLACE tenant, SET RENT, DEPOSIT tracking, BULK CSV upload,
           agent portfolio view (CLIENTS, TOTAL ALL, REMIND ALL), and full
           12-month landlord history.
         </div>
-
         <div class="cmd-note">
           <strong>How Paybill matching works:</strong> When a tenant pays your
           Paybill, they use their unit number as the account reference. RentLoop
@@ -1470,9 +1521,8 @@
           href="https://wa.me/254700000000?text=JOIN"
           target="_blank"
           class="btn-white"
+          >Send JOIN on WhatsApp →</a
         >
-          Send JOIN on WhatsApp →
-        </a>
       </div>
     </section>
 
@@ -1493,26 +1543,42 @@
     </footer>
 
     <script>
-      // 1. Update the copyright year in the footer
       document.getElementById("current-year").textContent =
         new Date().getFullYear();
 
+      function toggleMenu() {
+        const m = document.getElementById("mobileMenu");
+        m.classList.toggle("open");
+      }
+      function closeMenu() {
+        document.getElementById("mobileMenu").classList.remove("open");
+      }
+      // Close menu when clicking outside
+      document.addEventListener("click", function (e) {
+        const menu = document.getElementById("mobileMenu");
+        const toggle = document.querySelector(".nav-mobile-toggle");
+        if (
+          menu.classList.contains("open") &&
+          !menu.contains(e.target) &&
+          !toggle.contains(e.target)
+        ) {
+          menu.classList.remove("open");
+        }
+      });
+
       const io = new IntersectionObserver(
-        (entries) => {
+        (entries) =>
           entries.forEach((el) => {
             if (el.isIntersecting) {
               el.target.classList.add("visible");
               io.unobserve(el.target);
             }
-          });
-        },
-        { threshold: 0.08, rootMargin: "0px 0px -40px 0px" },
+          }),
+        { threshold: 0.07, rootMargin: "0px 0px -30px 0px" },
       );
-
       document.querySelectorAll(".fade-up").forEach((el) => io.observe(el));
-
       document.querySelectorAll(".step-card").forEach((card, i) => {
-        card.style.transitionDelay = `${i * 0.08}s`;
+        card.style.transitionDelay = `${i * 0.07}s`;
         card.classList.add("fade-up");
         io.observe(card);
       });
